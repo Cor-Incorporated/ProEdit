@@ -56,8 +56,35 @@ export function TextEditor({ effect, onSave, onClose, open }: TextEditorProps) {
         rect: {
           width: 800,
           height: 100,
-          position_on_canvas: { x, y }
-        }
+          scaleX: 1,
+          scaleY: 1,
+          position_on_canvas: { x, y },
+          rotation: 0,
+          pivot: { x: 0, y: 0 }
+        },
+        // Complete TextProperties defaults
+        fontVariant: 'normal',
+        fontWeight: 'normal',
+        fillGradientType: 0,
+        fillGradientStops: [],
+        stroke: '#000000',
+        strokeThickness: 0,
+        lineJoin: 'miter',
+        miterLimit: 10,
+        textBaseline: 'alphabetic',
+        letterSpacing: 0,
+        dropShadow: false,
+        dropShadowDistance: 0,
+        dropShadowBlur: 0,
+        dropShadowAlpha: 1,
+        dropShadowAngle: Math.PI / 4,
+        dropShadowColor: '#000000',
+        breakWords: false,
+        wordWrap: false,
+        lineHeight: 0,
+        leading: 0,
+        wordWrapWidth: 100,
+        whiteSpace: 'pre'
       },
       created_at: effect?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()

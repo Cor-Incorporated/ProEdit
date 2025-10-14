@@ -1,8 +1,9 @@
 import * as PIXI from 'pixi.js'
-import { Effect, isVideoEffect, isImageEffect, isAudioEffect } from '@/types/effects'
+import { Effect, isVideoEffect, isImageEffect, isAudioEffect, isTextEffect, TextEffect } from '@/types/effects'
 import { VideoManager } from '../managers/VideoManager'
 import { ImageManager } from '../managers/ImageManager'
 import { AudioManager } from '../managers/AudioManager'
+import { TextManager } from '../managers/TextManager'
 
 /**
  * Compositor - Main compositing engine
@@ -29,6 +30,7 @@ export class Compositor {
   private videoManager: VideoManager
   private imageManager: ImageManager
   private audioManager: AudioManager
+  private textManager: TextManager
 
   // Callbacks
   private onTimecodeChange?: (timecode: number) => void
@@ -41,14 +43,16 @@ export class Compositor {
   constructor(
     public app: PIXI.Application,
     private getMediaFileUrl: (mediaFileId: string) => Promise<string>,
-    private fps: number = 30
+    private fps: number = 30,
+    private onTextEffectUpdate?: (effectId: string, updates: Partial<TextEffect>) => Promise<void>
   ) {
     // Initialize managers
     this.videoManager = new VideoManager(app, getMediaFileUrl)
     this.imageManager = new ImageManager(app, getMediaFileUrl)
     this.audioManager = new AudioManager(getMediaFileUrl)
+    this.textManager = new TextManager(app, onTextEffectUpdate)
 
-    console.log('Compositor: Initialized')
+    console.log('Compositor: Initialized with TextManager')
   }
 
   /**
@@ -227,6 +231,8 @@ export class Compositor {
         this.videoManager.removeFromStage(id)
       } else if (isImageEffect(effect)) {
         this.imageManager.removeFromStage(id)
+      } else if (isTextEffect(effect)) {
+        this.textManager.remove_text_from_canvas(effect)
       }
 
       this.currentlyPlayedEffects.delete(id)
@@ -255,6 +261,12 @@ export class Compositor {
         if (this.isPlaying) {
           await this.audioManager.play(effect.id)
         }
+      } else if (isTextEffect(effect)) {
+        // Text overlay - Phase 7 T079
+        if (!this.textManager.has(effect.id)) {
+          await this.textManager.add_text_effect(effect, false)
+        }
+        this.textManager.add_text_to_canvas(effect)
       }
 
       this.currentlyPlayedEffects.set(effect.id, effect)
@@ -313,6 +325,8 @@ export class Compositor {
         this.videoManager.removeFromStage(effect.id)
       } else if (isImageEffect(effect)) {
         this.imageManager.removeFromStage(effect.id)
+      } else if (isTextEffect(effect)) {
+        this.textManager.remove_text_from_canvas(effect)
       }
     })
 
@@ -328,6 +342,7 @@ export class Compositor {
     this.videoManager.destroy()
     this.imageManager.destroy()
     this.audioManager.destroy()
+    this.textManager.destroy()
     this.currentlyPlayedEffects.clear()
   }
 
@@ -374,7 +389,7 @@ export class Compositor {
       this.play()
     }
 
-    // Return canvas for frame capture
-    return this.app.canvas as HTMLCanvasElement
+    // Return canvas for frame capture (v7 uses app.view instead of app.canvas)
+    return this.app.view as HTMLCanvasElement
   }
 }

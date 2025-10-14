@@ -8,8 +8,11 @@ import { PlaybackControls } from '@/features/compositor/components/PlaybackContr
 import { FPSCounter } from '@/features/compositor/components/FPSCounter'
 import { ExportDialog } from '@/features/export/components/ExportDialog'
 import { Button } from '@/components/ui/button'
-import { PanelRightOpen, Download } from 'lucide-react'
+import { PanelRightOpen, Download, Type } from 'lucide-react'
 import { Project } from '@/types/project'
+import { TextEffect } from '@/types/effects'
+import { TextEditor } from '@/features/effects/components/TextEditor'
+import { createTextEffect, updateTextEffectStyle } from '@/app/actions/effects'
 import { Compositor } from '@/features/compositor/utils/Compositor'
 import { useCompositorStore } from '@/stores/compositor'
 import { useTimelineStore } from '@/stores/timeline'
@@ -21,8 +24,8 @@ import { getMediaFileByHash } from '@/app/actions/media'
 import { downloadFile } from '@/features/export/utils/download'
 import { toast } from 'sonner'
 import * as PIXI from 'pixi.js'
-// Phase 9: Auto-save imports
-import { AutoSaveManager, SaveStatus } from '@/features/timeline/utils/autosave'
+// Phase 9: Auto-save imports (AutoSaveManager managed by Zustand)
+import { SaveStatus } from '@/features/timeline/utils/autosave'
 import { RealtimeSyncManager, ConflictData } from '@/lib/supabase/sync'
 import { SaveIndicatorCompact } from '@/components/SaveIndicator'
 import { ConflictResolutionDialog } from '@/components/ConflictResolutionDialog'
@@ -35,10 +38,13 @@ interface EditorClientProps {
 export function EditorClient({ project }: EditorClientProps) {
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  // Phase 7: Text Editor state
+  const [textEditorOpen, setTextEditorOpen] = useState(false)
+  const [selectedTextEffect, setSelectedTextEffect] = useState<TextEffect | null>(null)
+
   const compositorRef = useRef<Compositor | null>(null)
   const exportControllerRef = useRef<ExportController | null>(null)
-  // Phase 9: Auto-save state
-  const autoSaveManagerRef = useRef<AutoSaveManager | null>(null)
+  // Phase 9: Realtime sync state (AutoSave managed by Zustand)
   const syncManagerRef = useRef<RealtimeSyncManager | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [conflict, setConflict] = useState<ConflictData | null>(null)
@@ -56,7 +62,7 @@ export function EditorClient({ project }: EditorClientProps) {
     setActualFps,
   } = useCompositorStore()
 
-  const { effects } = useTimelineStore()
+  const { effects, updateEffect } = useTimelineStore()
 
   // Initialize FPS from project settings
   useEffect(() => {
@@ -71,9 +77,9 @@ export function EditorClient({ project }: EditorClientProps) {
       setShowRecoveryModal(true)
     }
 
-    // Initialize auto-save manager
-    autoSaveManagerRef.current = new AutoSaveManager(project.id, setSaveStatus)
-    autoSaveManagerRef.current.startAutoSave()
+    // Initialize auto-save through Zustand store - Phase 9 FR-009
+    const { initAutoSave, cleanup } = useTimelineStore.getState()
+    initAutoSave(project.id, setSaveStatus)
 
     // Initialize realtime sync
     syncManagerRef.current = new RealtimeSyncManager(project.id, {
@@ -91,9 +97,7 @@ export function EditorClient({ project }: EditorClientProps) {
 
     // Cleanup on unmount
     return () => {
-      if (autoSaveManagerRef.current) {
-        autoSaveManagerRef.current.cleanup()
-      }
+      cleanup() // AutoSave cleanup through Zustand
       if (syncManagerRef.current) {
         syncManagerRef.current.cleanup()
       }
@@ -112,14 +116,19 @@ export function EditorClient({ project }: EditorClientProps) {
 
   // Handle canvas ready
   const handleCanvasReady = (app: PIXI.Application) => {
-    // Create compositor instance
+    // Create compositor instance with TextManager support
     const compositor = new Compositor(
       app,
       async (mediaFileId: string) => {
         const url = await getSignedUrl(mediaFileId)
         return url
       },
-      project.settings.fps
+      project.settings.fps,
+      // Text effect update callback - Phase 7 T079
+      async (effectId: string, updates: Partial<TextEffect>) => {
+        await updateTextEffectStyle(effectId, updates.properties!)
+        updateEffect(effectId, updates)
+      }
     )
 
     // Set callbacks
@@ -128,7 +137,30 @@ export function EditorClient({ project }: EditorClientProps) {
 
     compositorRef.current = compositor
 
-    console.log('EditorClient: Compositor initialized')
+    console.log('EditorClient: Compositor initialized with TextManager')
+  }
+
+  // Phase 7 T077: Handle text effect creation/update
+  const handleTextSave = async (textEffect: TextEffect) => {
+    try {
+      if (selectedTextEffect) {
+        // Update existing text effect
+        const updated = await updateTextEffectStyle(textEffect.id, textEffect.properties)
+        updateEffect(textEffect.id, updated)
+        toast.success('Text updated')
+      } else {
+        // Create new text effect
+        const created = await createTextEffect(project.id, textEffect.properties.text)
+        // Add to timeline store
+        useTimelineStore.getState().addEffect(created)
+        toast.success('Text added to timeline')
+      }
+      setTextEditorOpen(false)
+      setSelectedTextEffect(null)
+    } catch (error) {
+      console.error('Text save error:', error)
+      toast.error('Failed to save text')
+    }
   }
 
   // Handle playback controls
@@ -249,6 +281,19 @@ export function EditorClient({ project }: EditorClientProps) {
           Open Media Library
         </Button>
 
+        {/* Phase 7 T077: Add Text Button */}
+        <Button
+          variant="outline"
+          className="absolute top-4 left-48"
+          onClick={() => {
+            setSelectedTextEffect(null)
+            setTextEditorOpen(true)
+          }}
+        >
+          <Type className="h-4 w-4 mr-2" />
+          Add Text
+        </Button>
+
         <Button
           variant="default"
           className="absolute top-4 right-4"
@@ -285,6 +330,17 @@ export function EditorClient({ project }: EditorClientProps) {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         onExport={handleExport}
+      />
+
+      {/* Phase 7 T077: Text Editor */}
+      <TextEditor
+        effect={selectedTextEffect ?? undefined}
+        open={textEditorOpen}
+        onSave={handleTextSave}
+        onClose={() => {
+          setTextEditorOpen(false)
+          setSelectedTextEffect(null)
+        }}
       />
 
       {/* Phase 9: Auto-save UI */}

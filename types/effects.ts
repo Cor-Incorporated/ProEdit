@@ -85,27 +85,38 @@ export interface AudioEffect extends BaseEffect {
   name: string; // Original filename (from omniclip)
 }
 
-// Text specific properties
+// Text specific properties - Complete omniclip compatibility
 export interface TextProperties {
   text: string;
   fontFamily: string;
   fontSize: number;
-  fontStyle: "normal" | "italic" | "bold" | "bold italic";
-  align: "left" | "center" | "right";
+  fontStyle: "normal" | "italic" | "oblique";
+  fontVariant: "normal" | "small-caps";
+  fontWeight: "normal" | "bold" | "bolder" | "lighter" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
+  align: "left" | "center" | "right" | "justify";
   fill: string[]; // Gradient colors
-  rect: {
-    width: number;
-    height: number;
-    position_on_canvas: Position;
-  };
-  stroke?: string;
-  strokeThickness?: number;
-  dropShadow?: boolean;
-  dropShadowDistance?: number;
-  dropShadowBlur?: number;
-  dropShadowAlpha?: number;
-  dropShadowAngle?: number;
-  dropShadowColor?: string;
+  fillGradientType: 0 | 1; // 0: VERTICAL, 1: HORIZONTAL
+  fillGradientStops: number[];
+  rect: Rect; // Full rect with all transform properties
+  stroke: string;
+  strokeThickness: number;
+  lineJoin: "miter" | "round" | "bevel";
+  miterLimit: number;
+  textBaseline: "alphabetic" | "top" | "hanging" | "middle" | "ideographic" | "bottom";
+  letterSpacing: number;
+  dropShadow: boolean;
+  dropShadowDistance: number;
+  dropShadowBlur: number;
+  dropShadowAlpha: number;
+  dropShadowAngle: number;
+  dropShadowColor: string;
+  // Advanced text properties from omniclip
+  breakWords: boolean;
+  wordWrap: boolean;
+  lineHeight: number;
+  leading: number;
+  wordWrapWidth: number;
+  whiteSpace: "pre" | "normal" | "pre-line";
 }
 
 export interface TextEffect extends BaseEffect {

@@ -332,3 +332,149 @@ function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: Re
 
   return {}
 }
+
+// ======================================
+// Text Effect CRUD - T076 (Phase 7)
+// ======================================
+
+/**
+ * Create text effect with full styling support
+ * Constitutional FR-007 compliance
+ */
+export async function createTextEffect(
+  projectId: string,
+  text: string,
+  position?: { x: number; y: number },
+  track?: number
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effects for smart placement
+  const existingEffects = await getEffects(projectId)
+
+  // Calculate optimal position
+  const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
+  const optimal = findPlaceForNewEffect(existingEffects, 3)
+
+  const textEffect = {
+    kind: 'text' as const,
+    track: track ?? optimal.track,
+    start_at_position: position?.x ?? optimal.position,
+    duration: 5000,  // Default 5 seconds
+    start: 0,
+    end: 5000,
+    properties: {
+      text: text || 'Default text',
+      fontFamily: 'Arial',
+      fontSize: 38,
+      fontStyle: 'normal' as const,
+      fontVariant: 'normal' as const,
+      fontWeight: 'normal' as const,
+      align: 'center' as const,
+      fill: ['#FFFFFF'],
+      fillGradientType: 0 as 0 | 1,
+      fillGradientStops: [],
+      rect: {
+        width: 400,
+        height: 100,
+        scaleX: 1,
+        scaleY: 1,
+        position_on_canvas: {
+          x: position?.x ?? 960,  // Center X
+          y: position?.y ?? 540   // Center Y
+        },
+        rotation: 0,
+        pivot: { x: 0, y: 0 }
+      },
+      stroke: '#FFFFFF',
+      strokeThickness: 0,
+      lineJoin: 'miter' as const,
+      miterLimit: 10,
+      textBaseline: 'alphabetic' as const,
+      letterSpacing: 0,
+      dropShadow: false,
+      dropShadowDistance: 5,
+      dropShadowBlur: 0,
+      dropShadowAlpha: 1,
+      dropShadowAngle: 0.5,
+      dropShadowColor: '#000000',
+      breakWords: false,
+      wordWrap: false,
+      lineHeight: 0,
+      leading: 0,
+      wordWrapWidth: 100,
+      whiteSpace: 'pre' as const
+    }
+  } as Omit<Effect, 'id' | 'project_id' | 'created_at' | 'updated_at'>
+
+  return createEffect(projectId, textEffect)
+}
+
+/**
+ * Update text effect styling
+ * Supports all TextStyleOptions from TextManager
+ */
+export async function updateTextEffectStyle(
+  effectId: string,
+  styleUpdates: Partial<TextProperties>
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effect
+  const { data: existingEffect } = await supabase
+    .from('effects')
+    .select('properties')
+    .eq('id', effectId)
+    .single()
+
+  if (!existingEffect) throw new Error('Effect not found')
+
+  const updatedProperties = {
+    ...(existingEffect.properties as TextProperties),
+    ...styleUpdates
+  }
+
+  return updateEffect(effectId, { properties: updatedProperties as unknown as TextProperties })
+}
+
+/**
+ * Batch update text positions (for drag operations)
+ */
+export async function updateTextPosition(
+  effectId: string,
+  position: { x: number; y: number },
+  rotation?: number,
+  scale?: { x: number; y: number }
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effect
+  const { data: existingEffect } = await supabase
+    .from('effects')
+    .select('properties')
+    .eq('id', effectId)
+    .single()
+
+  if (!existingEffect) throw new Error('Effect not found')
+
+  const props = existingEffect.properties as TextProperties
+  const updatedRect = {
+    ...props.rect,
+    position_on_canvas: position,
+    ...(rotation !== undefined && { rotation }),
+    ...(scale && { scaleX: scale.x, scaleY: scale.y })
+  }
+
+  return updateEffect(effectId, {
+    properties: {
+      ...props,
+      rect: updatedRect
+    } as unknown as TextProperties
+  })
+}
