@@ -64,19 +64,19 @@ Install Command: npm install
 ```
 
 #### 2.3 環境変数設定 ⚠️ **重要**
-以下の環境変数を設定してください：
 
-```bash
-# Supabase接続情報
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-```
+**詳細な設定手順は [VERCEL_ENV_SETUP.md](./VERCEL_ENV_SETUP.md) を参照してください。**
 
-**取得方法**:
-1. [Supabase Dashboard](https://supabase.com/dashboard) を開く
-2. プロジェクトを選択
-3. **Settings** → **API** に移動
-4. **Project URL** と **anon public** キーをコピー
+以下の2つの環境変数を **Vercel Dashboard** で設定：
+
+| Name                            | Value                       | Environment                    |
+|---------------------------------|-----------------------------|--------------------------------|
+| `NEXT_PUBLIC_SUPABASE_URL`      | `https://xxxxx.supabase.co` | Production/Preview/Development |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGc...`                | Production/Preview/Development |
+
+**重要**: 
+- ❌ vercel.jsonに環境変数を書かない（修正済み）
+- ✅ Vercel Dashboardで直接設定する
 
 ### 3. デプロイ実行
 
