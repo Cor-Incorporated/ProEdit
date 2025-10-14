@@ -1,0 +1,796 @@
+openapi: 3.1.0
+info:
+  title: ProEdit MVP API
+  description: Browser-based video editor API contracts using Supabase and Server Actions
+  version: 1.0.0
+  contact:
+    name: ProEdit Team
+
+servers:
+  - url: https://api.proedit.app
+    description: Production server
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication operations (Supabase Auth)
+  - name: Projects
+    description: Project management operations
+  - name: Media
+    description: Media file operations
+  - name: Effects
+    description: Timeline effect operations
+  - name: Export
+    description: Video export operations
+
+paths:
+  # Authentication (Supabase Auth)
+  /auth/signin:
+    post:
+      tags: [Auth]
+      summary: Sign in with OAuth provider
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider]
+              properties:
+                provider:
+                  type: string
+                  enum: [google]
+                  description: OAuth provider
+                redirectTo:
+                  type: string
+                  format: uri
+                  description: Redirect URL after authentication
+      responses:
+        200:
+          description: Authentication URL returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                    description: OAuth redirect URL
+        400:
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/signout:
+    post:
+      tags: [Auth]
+      summary: Sign out current user
+      operationId: signOut
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Successfully signed out
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: Get current session
+      operationId: getSession
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  # Projects (Server Actions)
+  /actions/projects:
+    get:
+      tags: [Projects]
+      summary: List user's projects
+      operationId: listProjects
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        200:
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Projects]
+      summary: Create new project
+      operationId: createProject
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                settings:
+                  $ref: '#/components/schemas/ProjectSettings'
+      responses:
+        201:
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+
+  /actions/projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+
+    get:
+      tags: [Projects]
+      summary: Get project details
+      operationId: getProject
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectWithRelations'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Projects]
+      summary: Update project
+      operationId: updateProject
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                settings:
+                  $ref: '#/components/schemas/ProjectSettings'
+      responses:
+        200:
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Projects]
+      summary: Delete project
+      operationId: deleteProject
+      security:
+        - BearerAuth: []
+      responses:
+        204:
+          description: Project deleted
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # Media Files
+  /actions/media/upload:
+    post:
+      tags: [Media]
+      summary: Upload media file
+      operationId: uploadMedia
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Media file (video, audio, or image)
+      responses:
+        201:
+          description: Media uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        413:
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /actions/media/{mediaId}:
+    parameters:
+      - $ref: '#/components/parameters/MediaId'
+
+    get:
+      tags: [Media]
+      summary: Get media file metadata
+      operationId: getMediaFile
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Media file metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Media]
+      summary: Delete media file
+      operationId: deleteMediaFile
+      security:
+        - BearerAuth: []
+      responses:
+        204:
+          description: Media deleted
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  /actions/media/{mediaId}/download:
+    parameters:
+      - $ref: '#/components/parameters/MediaId'
+
+    get:
+      tags: [Media]
+      summary: Get signed URL for media download
+      operationId: getMediaDownloadUrl
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Signed download URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                    description: Temporary signed URL (expires in 1 hour)
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # Effects
+  /actions/projects/{projectId}/effects:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+
+    get:
+      tags: [Effects]
+      summary: List project effects
+      operationId: listEffects
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: List of effects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Effect'
+
+    post:
+      tags: [Effects]
+      summary: Add effect to timeline
+      operationId: createEffect
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EffectCreate'
+      responses:
+        201:
+          description: Effect created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Effect'
+        400:
+          $ref: '#/components/responses/BadRequest'
+
+  /actions/effects/{effectId}:
+    parameters:
+      - $ref: '#/components/parameters/EffectId'
+
+    patch:
+      tags: [Effects]
+      summary: Update effect
+      operationId: updateEffect
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EffectUpdate'
+      responses:
+        200:
+          description: Effect updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Effect'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Effects]
+      summary: Remove effect from timeline
+      operationId: deleteEffect
+      security:
+        - BearerAuth: []
+      responses:
+        204:
+          description: Effect removed
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # Export
+  /actions/projects/{projectId}/export:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+
+    post:
+      tags: [Export]
+      summary: Start video export
+      operationId: startExport
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportSettings'
+      responses:
+        202:
+          description: Export started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        400:
+          $ref: '#/components/responses/BadRequest'
+
+  /actions/exports/{exportId}:
+    parameters:
+      - $ref: '#/components/parameters/ExportId'
+
+    get:
+      tags: [Export]
+      summary: Get export status
+      operationId: getExportStatus
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: Export job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Export]
+      summary: Cancel export job
+      operationId: cancelExport
+      security:
+        - BearerAuth: []
+      responses:
+        204:
+          description: Export cancelled
+        404:
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Supabase JWT token
+
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    EffectId:
+      name: effectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ExportId:
+      name: exportId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_at:
+          type: integer
+          description: Unix timestamp
+
+    User:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    Project:
+      type: object
+      required: [id, name, user_id, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        settings:
+          $ref: '#/components/schemas/ProjectSettings'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectWithRelations:
+      allOf:
+        - $ref: '#/components/schemas/Project'
+        - type: object
+          properties:
+            tracks:
+              type: array
+              items:
+                $ref: '#/components/schemas/Track'
+            effects:
+              type: array
+              items:
+                $ref: '#/components/schemas/Effect'
+
+    ProjectSettings:
+      type: object
+      required: [width, height, fps]
+      properties:
+        width:
+          type: integer
+          default: 1920
+        height:
+          type: integer
+          default: 1080
+        fps:
+          type: integer
+          default: 30
+        aspectRatio:
+          type: string
+          default: "16:9"
+        bitrate:
+          type: integer
+          default: 9000
+        standard:
+          type: string
+          default: "1080p"
+
+    MediaFile:
+      type: object
+      required: [id, user_id, file_hash, filename, file_size, mime_type, storage_path]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        file_hash:
+          type: string
+        filename:
+          type: string
+        file_size:
+          type: integer
+        mime_type:
+          type: string
+        storage_path:
+          type: string
+        metadata:
+          type: object
+          properties:
+            duration:
+              type: integer
+            fps:
+              type: number
+            frames:
+              type: integer
+            width:
+              type: integer
+            height:
+              type: integer
+            codec:
+              type: string
+            thumbnail:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Track:
+      type: object
+      required: [id, project_id, track_index]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        track_index:
+          type: integer
+        visible:
+          type: boolean
+          default: true
+        locked:
+          type: boolean
+          default: false
+        muted:
+          type: boolean
+          default: false
+
+    Effect:
+      type: object
+      required: [id, project_id, kind, track, start_at_position, duration]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [video, audio, image, text]
+        track:
+          type: integer
+        start_at_position:
+          type: integer
+        duration:
+          type: integer
+        start_time:
+          type: integer
+        end_time:
+          type: integer
+        media_file_id:
+          type: string
+          format: uuid
+          nullable: true
+        properties:
+          type: object
+          description: Type-specific properties (rect, text, etc.)
+
+    EffectCreate:
+      type: object
+      required: [kind, track, start_at_position, duration]
+      properties:
+        kind:
+          type: string
+          enum: [video, audio, image, text]
+        track:
+          type: integer
+        start_at_position:
+          type: integer
+        duration:
+          type: integer
+        start_time:
+          type: integer
+          default: 0
+        end_time:
+          type: integer
+        media_file_id:
+          type: string
+          format: uuid
+        properties:
+          type: object
+
+    EffectUpdate:
+      type: object
+      properties:
+        track:
+          type: integer
+        start_at_position:
+          type: integer
+        duration:
+          type: integer
+        start_time:
+          type: integer
+        end_time:
+          type: integer
+        properties:
+          type: object
+
+    ExportSettings:
+      type: object
+      required: [resolution, quality]
+      properties:
+        resolution:
+          type: string
+          enum: [720p, 1080p, 4K]
+        quality:
+          type: string
+          enum: [low, medium, high]
+        format:
+          type: string
+          enum: [mp4, webm]
+          default: mp4
+        includeAudio:
+          type: boolean
+          default: true
+
+    ExportJob:
+      type: object
+      required: [id, project_id, status, settings]
+      properties:
+        id:
+          type: string
+          format: uuid
+        project_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed, cancelled]
+        settings:
+          $ref: '#/components/schemas/ExportSettings'
+        output_url:
+          type: string
+          format: uri
+          nullable: true
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
