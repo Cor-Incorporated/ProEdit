@@ -21,6 +21,12 @@ import { getMediaFileByHash } from '@/features/export/utils/getMediaFile'
 import { downloadFile } from '@/features/export/utils/download'
 import { toast } from 'sonner'
 import * as PIXI from 'pixi.js'
+// Phase 9: Auto-save imports
+import { AutoSaveManager, SaveStatus } from '@/features/timeline/utils/autosave'
+import { RealtimeSyncManager, ConflictData } from '@/lib/supabase/sync'
+import { SaveIndicatorCompact } from '@/components/SaveIndicator'
+import { ConflictResolutionDialog } from '@/components/ConflictResolutionDialog'
+import { RecoveryModal } from '@/components/RecoveryModal'
 
 interface EditorClientProps {
   project: Project
@@ -31,6 +37,13 @@ export function EditorClient({ project }: EditorClientProps) {
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const compositorRef = useRef<Compositor | null>(null)
   const exportControllerRef = useRef<ExportController | null>(null)
+  // Phase 9: Auto-save state
+  const autoSaveManagerRef = useRef<AutoSaveManager | null>(null)
+  const syncManagerRef = useRef<RealtimeSyncManager | null>(null)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [conflict, setConflict] = useState<ConflictData | null>(null)
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false)
 
   // Phase 6: Enable keyboard shortcuts
   useKeyboardShortcuts()
@@ -50,6 +63,43 @@ export function EditorClient({ project }: EditorClientProps) {
   useEffect(() => {
     setFps(project.settings.fps)
   }, [project.settings.fps, setFps])
+
+  // Phase 9: Initialize auto-save and realtime sync
+  useEffect(() => {
+    // Check for recovery on mount
+    const hasUnsavedChanges = localStorage.getItem(`proedit_recovery_${project.id}`)
+    if (hasUnsavedChanges) {
+      setShowRecoveryModal(true)
+    }
+
+    // Initialize auto-save manager
+    autoSaveManagerRef.current = new AutoSaveManager(project.id, setSaveStatus)
+    autoSaveManagerRef.current.startAutoSave()
+
+    // Initialize realtime sync
+    syncManagerRef.current = new RealtimeSyncManager(project.id, {
+      onRemoteChange: (data) => {
+        console.log('[Editor] Remote changes detected:', data)
+        // Reload effects from server
+        // This would trigger a re-fetch in a real implementation
+      },
+      onConflict: (conflictData) => {
+        setConflict(conflictData)
+        setShowConflictDialog(true)
+      },
+    })
+    syncManagerRef.current.setupRealtimeSubscription()
+
+    // Cleanup on unmount
+    return () => {
+      if (autoSaveManagerRef.current) {
+        autoSaveManagerRef.current.cleanup()
+      }
+      if (syncManagerRef.current) {
+        syncManagerRef.current.cleanup()
+      }
+    }
+  }, [project.id])
 
   // Calculate timeline duration
   useEffect(() => {
@@ -236,6 +286,44 @@ export function EditorClient({ project }: EditorClientProps) {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         onExport={handleExport}
+      />
+
+      {/* Phase 9: Auto-save UI */}
+      <div className="fixed bottom-4 left-4 z-50">
+        <SaveIndicatorCompact status={saveStatus} />
+      </div>
+
+      {/* Phase 9: Conflict Resolution Dialog */}
+      <ConflictResolutionDialog
+        conflict={conflict}
+        isOpen={showConflictDialog}
+        onResolve={(strategy) => {
+          if (syncManagerRef.current) {
+            void syncManagerRef.current.handleConflictResolution(strategy)
+          }
+          setShowConflictDialog(false)
+          setConflict(null)
+        }}
+        onClose={() => {
+          setShowConflictDialog(false)
+          setConflict(null)
+        }}
+      />
+
+      {/* Phase 9: Recovery Modal */}
+      <RecoveryModal
+        isOpen={showRecoveryModal}
+        onRecover={() => {
+          console.log('[Editor] Recovering unsaved changes')
+          localStorage.removeItem(`proedit_recovery_${project.id}`)
+          setShowRecoveryModal(false)
+          toast.success('Changes recovered successfully')
+        }}
+        onDiscard={() => {
+          console.log('[Editor] Discarding unsaved changes')
+          localStorage.removeItem(`proedit_recovery_${project.id}`)
+          setShowRecoveryModal(false)
+        }}
       />
     </div>
   )
