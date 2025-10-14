@@ -16,6 +16,8 @@ export class AutoSaveManager {
   private isOnline = true;
   private projectId: string;
   private onStatusChange?: (status: SaveStatus) => void;
+  // P0-2 FIX: Add mutex to prevent race conditions
+  private isSaving = false;
 
   constructor(
     projectId: string,
@@ -68,14 +70,24 @@ export class AutoSaveManager {
   /**
    * Save immediately
    * Handles both online and offline scenarios
+   * P0-2 FIX: Prevent concurrent saves with mutex
    */
   async saveNow(): Promise<void> {
+    // P0-2 FIX: Check if already saving
+    if (this.isSaving) {
+      console.log("[AutoSave] Save already in progress, skipping");
+      return;
+    }
+
     if (!this.isOnline) {
       console.log("[AutoSave] Offline - queueing save operation");
       this.offlineQueue.push(() => this.performSave());
       this.onStatusChange?.("offline");
       return;
     }
+
+    // P0-2 FIX: Set mutex before starting
+    this.isSaving = true;
 
     try {
       this.onStatusChange?.("saving");
@@ -85,6 +97,9 @@ export class AutoSaveManager {
     } catch (error) {
       console.error("[AutoSave] Save failed:", error);
       this.onStatusChange?.("error");
+    } finally {
+      // P0-2 FIX: Always release mutex
+      this.isSaving = false;
     }
   }
 

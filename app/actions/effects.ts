@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Effect, VideoImageProperties, AudioProperties, TextProperties } from '@/types/effects'
+// P0-3 FIX: Add input validation
+import { validateEffectProperties, validatePartialEffectProperties, EffectBaseSchema } from '@/lib/validation/effect-schemas'
 
 /**
  * Create a new effect on the timeline
@@ -29,19 +31,33 @@ export async function createEffect(
 
   if (!project) throw new Error('Project not found')
 
+  // P0-3 FIX: Validate effect base fields
+  const validatedBase = EffectBaseSchema.parse({
+    kind: effect.kind,
+    track: effect.track,
+    start_at_position: effect.start_at_position,
+    duration: effect.duration,
+    start: effect.start,
+    end: effect.end,
+    media_file_id: effect.media_file_id || null,
+  });
+
+  // P0-3 FIX: Validate properties based on effect kind
+  const validatedProperties = validateEffectProperties(effect.kind, effect.properties);
+
   // Insert effect
   const { data, error } = await supabase
     .from('effects')
     .insert({
       project_id: projectId,
-      kind: effect.kind,
-      track: effect.track,
-      start_at_position: effect.start_at_position,
-      duration: effect.duration,
-      start: effect.start, // Trim start (omniclip)
-      end: effect.end, // Trim end (omniclip)
-      media_file_id: effect.media_file_id || null,
-      properties: effect.properties as unknown as Record<string, unknown>,
+      kind: validatedBase.kind,
+      track: validatedBase.track,
+      start_at_position: validatedBase.start_at_position,
+      duration: validatedBase.duration,
+      start: validatedBase.start, // Trim start (omniclip)
+      end: validatedBase.end, // Trim end (omniclip)
+      media_file_id: validatedBase.media_file_id,
+      properties: validatedProperties as Record<string, unknown>,
       // Add metadata fields
       file_hash: 'file_hash' in effect ? effect.file_hash : null,
       name: 'name' in effect ? effect.name : null,
@@ -126,12 +142,31 @@ export async function updateEffect(
     throw new Error('Unauthorized')
   }
 
+  // P0-3 FIX: Validate properties if provided
+  let validatedUpdates = { ...updates };
+  if (updates.properties) {
+    // Get effect to know its kind
+    const { data: effectData } = await supabase
+      .from('effects')
+      .select('kind')
+      .eq('id', effectId)
+      .single();
+
+    if (effectData) {
+      const validatedProperties = validatePartialEffectProperties(effectData.kind, updates.properties);
+      validatedUpdates = {
+        ...updates,
+        properties: validatedProperties as VideoImageProperties | AudioProperties | TextProperties,
+      };
+    }
+  }
+
   // Update effect
   const { data, error } = await supabase
     .from('effects')
     .update({
-      ...updates,
-      properties: updates.properties as unknown as Record<string, unknown> | undefined,
+      ...validatedUpdates,
+      properties: validatedUpdates.properties as unknown as Record<string, unknown> | undefined,
     })
     .eq('id', effectId)
     .select()
