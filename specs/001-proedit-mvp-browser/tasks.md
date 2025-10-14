@@ -41,30 +41,30 @@
 
 ### Database & Authentication Setup
 
-- [ ] T007 Set up Supabase project and configure connection in lib/supabase/client.ts
-- [ ] T008 Run database migrations for all tables (projects, media_files, tracks, effects) from data-model.md
-- [ ] T009 Configure Row Level Security policies for all tables per data-model.md
-- [ ] T010 Set up Supabase Storage bucket 'media-files' with policies
-- [ ] T011 Configure Google OAuth in Supabase Dashboard
+- [X] T007 Set up Supabase project and configure connection in lib/supabase/client.ts
+- [X] T008 Run database migrations for all tables (projects, media_files, tracks, effects) from data-model.md
+- [X] T009 Configure Row Level Security policies for all tables per data-model.md
+- [X] T010 Set up Supabase Storage bucket 'media-files' with policies
+- [X] T011 Configure Google OAuth in Supabase Dashboard
 
 ### Core Libraries & State Management
 
-- [ ] T012 [P] Install and configure Zustand store structure in stores/index.ts
-- [ ] T013 [P] Set up PIXI.js v8 initialization helper in lib/pixi/setup.ts
-- [ ] T014 [P] Configure FFmpeg.wasm loader in lib/ffmpeg/loader.ts
-- [ ] T015 [P] Create Supabase client utilities (server.ts, client.ts) in lib/supabase/
+- [X] T012 [P] Install and configure Zustand store structure in stores/index.ts
+- [X] T013 [P] Set up PIXI.js v8 initialization helper in lib/pixi/setup.ts
+- [X] T014 [P] Configure FFmpeg.wasm loader in lib/ffmpeg/loader.ts
+- [X] T015 [P] Create Supabase client utilities (server.ts, client.ts) in lib/supabase/
 
 ### Type Definitions (from omniclip)
 
-- [ ] T016 [P] Copy and adapt Effect type definitions from omniclip to types/effects.ts
-- [ ] T017 [P] Create Project and Media types in types/project.ts and types/media.ts
-- [ ] T018 [P] Generate Supabase database types with CLI to types/supabase.ts
+- [X] T016 [P] Copy and adapt Effect type definitions from omniclip to types/effects.ts
+- [X] T017 [P] Create Project and Media types in types/project.ts and types/media.ts
+- [X] T018 [P] Generate Supabase database types with CLI to types/supabase.ts
 
 ### Base UI Components
 
-- [ ] T019 [P] Create base layout structure in app/(auth)/layout.tsx and app/(editor)/layout.tsx
-- [ ] T020 [P] Set up error boundary and loading states in app/error.tsx and app/loading.tsx
-- [ ] T021 [P] Configure shadcn/ui theme and global styles in app/globals.css
+- [X] T019 [P] Create base layout structure in app/(auth)/layout.tsx and app/(editor)/layout.tsx
+- [X] T020 [P] Set up error boundary and loading states in app/error.tsx and app/loading.tsx
+- [X] T021 [P] Configure shadcn/ui theme and global styles in app/globals.css
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
