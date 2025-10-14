@@ -1,0 +1,15 @@
+# Features Directory
+
+This directory contains modular feature implementations for ProEdit.
+
+Each feature is self-contained with its own components, hooks, utilities, and logic.
+
+## Feature Modules:
+- `timeline/` - Timeline management and effect placement
+- `compositor/` - PIXI.js rendering and playback
+- `media/` - Media file management and uploads
+- `effects/` - Filters, text overlays, and animations
+- `export/` - Video export with FFmpeg.wasm
+
+For detailed information about each feature, see the README.md in each subdirectory.
+

@@ -47,12 +47,18 @@ export interface VideoEffect extends BaseEffect {
   kind: "video";
   properties: VideoImageProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
+  thumbnail: string; // Thumbnail URL (from omniclip)
 }
 
 export interface ImageEffect extends BaseEffect {
   kind: "image";
   properties: VideoImageProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
+  thumbnail: string; // Thumbnail URL (from omniclip)
 }
 
 // Audio specific properties
@@ -66,6 +72,8 @@ export interface AudioEffect extends BaseEffect {
   kind: "audio";
   properties: AudioProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
 }
 
 // Text specific properties
