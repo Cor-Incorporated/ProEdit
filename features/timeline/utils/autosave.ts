@@ -21,6 +21,9 @@ export class AutoSaveManager {
   // Security: Rate limiting to prevent database spam
   private lastSaveTime = 0;
   private readonly MIN_SAVE_INTERVAL = 1000; // Minimum 1 second between saves
+  // Metrics: Track save conflicts for monitoring
+  private saveConflictCount = 0;
+  private rateLimitHitCount = 0;
 
   constructor(
     projectId: string,
@@ -79,7 +82,8 @@ export class AutoSaveManager {
   async saveNow(): Promise<void> {
     // P0-2 FIX: Check if already saving
     if (this.isSaving) {
-      console.log("[AutoSave] Save already in progress, skipping");
+      this.saveConflictCount++;
+      console.warn(`[AutoSave] Save conflict #${this.saveConflictCount} - Save already in progress, skipping`);
       return;
     }
 
@@ -87,7 +91,8 @@ export class AutoSaveManager {
     const now = Date.now();
     const timeSinceLastSave = now - this.lastSaveTime;
     if (timeSinceLastSave < this.MIN_SAVE_INTERVAL) {
-      console.log(`[AutoSave] Rate limit: ${timeSinceLastSave}ms since last save, minimum ${this.MIN_SAVE_INTERVAL}ms required`);
+      this.rateLimitHitCount++;
+      console.log(`[AutoSave] Rate limit hit #${this.rateLimitHitCount}: ${timeSinceLastSave}ms since last save, minimum ${this.MIN_SAVE_INTERVAL}ms required`);
       return;
     }
 
@@ -187,6 +192,19 @@ export class AutoSaveManager {
   }
 
   /**
+   * Get save metrics for monitoring/debugging
+   */
+  getMetrics() {
+    return {
+      saveConflicts: this.saveConflictCount,
+      rateLimitHits: this.rateLimitHitCount,
+      offlineQueueSize: this.offlineQueue.length,
+      isOnline: this.isOnline,
+      isSaving: this.isSaving,
+    };
+  }
+
+  /**
    * Cleanup when component unmounts
    */
   cleanup(): void {
@@ -194,6 +212,12 @@ export class AutoSaveManager {
 
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
+    }
+
+    // Log metrics on cleanup for debugging
+    const metrics = this.getMetrics();
+    if (metrics.saveConflicts > 0 || metrics.rateLimitHits > 0) {
+      console.log("[AutoSave] Session metrics:", metrics);
     }
 
     // Save any pending changes before cleanup

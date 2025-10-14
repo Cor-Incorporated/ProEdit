@@ -295,11 +295,27 @@ export async function createEffectFromMediaFile(
 
   if (!kind) throw new Error('Unsupported media type')
 
-  // 4. Get metadata
+  // 4. Get project settings for canvas dimensions
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('settings')
+    .eq('id', projectId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (projectError || !project) {
+    throw new Error('Project not found')
+  }
+
+  const settings = (project.settings as Record<string, unknown>) || {}
+  const canvasWidth = (settings.width as number | undefined) || 1920
+  const canvasHeight = (settings.height as number | undefined) || 1080
+
+  // 5. Get metadata
   const metadata = mediaFile.metadata as Record<string, unknown>
   const rawDuration = ((metadata.duration as number | undefined) || 5) * 1000 // Default 5s for images
 
-  // 5. Calculate optimal position and track if not provided
+  // 6. Calculate optimal position and track if not provided
   const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
   let position = targetPosition ?? 0
   let track = targetTrack ?? 0
@@ -310,7 +326,7 @@ export async function createEffectFromMediaFile(
     track = targetTrack ?? optimal.track
   }
 
-  // 6. Create effect with appropriate properties
+  // 7. Create effect with appropriate properties
   const effectData = {
     kind,
     track,
@@ -323,7 +339,7 @@ export async function createEffectFromMediaFile(
     name: mediaFile.filename,
     thumbnail: kind === 'video' ? ((metadata.thumbnail as string | undefined) || '') :
                kind === 'image' ? (mediaFile.storage_path || '') : '',
-    properties: createDefaultProperties(kind, metadata) as unknown as VideoImageProperties | AudioProperties | TextProperties,
+    properties: createDefaultProperties(kind, metadata, canvasWidth, canvasHeight) as unknown as VideoImageProperties | AudioProperties | TextProperties,
   } as Omit<Effect, 'id' | 'project_id' | 'created_at' | 'updated_at'>
 
   // 7. Create effect in database
@@ -332,11 +348,20 @@ export async function createEffectFromMediaFile(
 
 /**
  * Create default properties based on media type
+ * @param kind Effect type (video, audio, image)
+ * @param metadata Media file metadata
+ * @param canvasWidth Canvas width from project settings
+ * @param canvasHeight Canvas height from project settings
  */
-function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: Record<string, unknown>): Record<string, unknown> {
+function createDefaultProperties(
+  kind: 'video' | 'audio' | 'image',
+  metadata: Record<string, unknown>,
+  canvasWidth: number = 1920,
+  canvasHeight: number = 1080
+): Record<string, unknown> {
   if (kind === 'video' || kind === 'image') {
-    const width = (metadata.width as number | undefined) || 1920
-    const height = (metadata.height as number | undefined) || 1080
+    const width = (metadata.width as number | undefined) || canvasWidth
+    const height = (metadata.height as number | undefined) || canvasHeight
 
     return {
       rect: {
@@ -345,8 +370,8 @@ function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: Re
         scaleX: 1,
         scaleY: 1,
         position_on_canvas: {
-          x: 1920 / 2, // Center X
-          y: 1080 / 2  // Center Y
+          x: canvasWidth / 2,  // Center X based on project settings
+          y: canvasHeight / 2  // Center Y based on project settings
         },
         rotation: 0,
         pivot: {
@@ -386,6 +411,22 @@ export async function createTextEffect(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // Get project settings for canvas dimensions
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('settings')
+    .eq('id', projectId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (projectError || !project) {
+    throw new Error('Project not found')
+  }
+
+  const settings = (project.settings as Record<string, unknown>) || {}
+  const canvasWidth = (settings.width as number | undefined) || 1920
+  const canvasHeight = (settings.height as number | undefined) || 1080
+
   // Get existing effects for smart placement
   const existingEffects = await getEffects(projectId)
 
@@ -417,8 +458,8 @@ export async function createTextEffect(
         scaleX: 1,
         scaleY: 1,
         position_on_canvas: {
-          x: position?.x ?? 960,  // Center X
-          y: position?.y ?? 540   // Center Y
+          x: position?.x ?? (canvasWidth / 2),  // Center X based on project settings
+          y: position?.y ?? (canvasHeight / 2)  // Center Y based on project settings
         },
         rotation: 0,
         pivot: { x: 0, y: 0 }
