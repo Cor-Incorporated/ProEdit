@@ -2,7 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { Effect } from '@/types/effects'
+import { Effect, VideoImageProperties, AudioProperties, TextProperties } from '@/types/effects'
+// P0-3 FIX: Add input validation
+import { validateEffectProperties, validatePartialEffectProperties, EffectBaseSchema } from '@/lib/validation/effect-schemas'
 
 /**
  * Create a new effect on the timeline
@@ -29,19 +31,33 @@ export async function createEffect(
 
   if (!project) throw new Error('Project not found')
 
+  // P0-3 FIX: Validate effect base fields
+  const validatedBase = EffectBaseSchema.parse({
+    kind: effect.kind,
+    track: effect.track,
+    start_at_position: effect.start_at_position,
+    duration: effect.duration,
+    start: effect.start,
+    end: effect.end,
+    media_file_id: effect.media_file_id || null,
+  });
+
+  // P0-3 FIX: Validate properties based on effect kind
+  const validatedProperties = validateEffectProperties(effect.kind, effect.properties);
+
   // Insert effect
   const { data, error } = await supabase
     .from('effects')
     .insert({
       project_id: projectId,
-      kind: effect.kind,
-      track: effect.track,
-      start_at_position: effect.start_at_position,
-      duration: effect.duration,
-      start: effect.start, // Trim start (omniclip)
-      end: effect.end, // Trim end (omniclip)
-      media_file_id: effect.media_file_id || null,
-      properties: effect.properties as any,
+      kind: validatedBase.kind,
+      track: validatedBase.track,
+      start_at_position: validatedBase.start_at_position,
+      duration: validatedBase.duration,
+      start: validatedBase.start, // Trim start (omniclip)
+      end: validatedBase.end, // Trim end (omniclip)
+      media_file_id: validatedBase.media_file_id,
+      properties: validatedProperties as Record<string, unknown>,
       // Add metadata fields
       file_hash: 'file_hash' in effect ? effect.file_hash : null,
       name: 'name' in effect ? effect.name : null,
@@ -121,17 +137,36 @@ export async function updateEffect(
   if (!effect) throw new Error('Effect not found')
 
   // Type assertion to access nested fields
-  const effectWithProject = effect as any
+  const effectWithProject = effect as unknown as { project_id: string; projects: { user_id: string } }
   if (effectWithProject.projects.user_id !== user.id) {
     throw new Error('Unauthorized')
+  }
+
+  // P0-3 FIX: Validate properties if provided
+  let validatedUpdates = { ...updates };
+  if (updates.properties) {
+    // Get effect to know its kind
+    const { data: effectData } = await supabase
+      .from('effects')
+      .select('kind')
+      .eq('id', effectId)
+      .single();
+
+    if (effectData) {
+      const validatedProperties = validatePartialEffectProperties(effectData.kind, updates.properties);
+      validatedUpdates = {
+        ...updates,
+        properties: validatedProperties as VideoImageProperties | AudioProperties | TextProperties,
+      };
+    }
   }
 
   // Update effect
   const { data, error } = await supabase
     .from('effects')
     .update({
-      ...updates,
-      properties: updates.properties as any,
+      ...validatedUpdates,
+      properties: validatedUpdates.properties as unknown as Record<string, unknown> | undefined,
     })
     .eq('id', effectId)
     .select()
@@ -167,7 +202,7 @@ export async function deleteEffect(effectId: string): Promise<void> {
   if (!effect) throw new Error('Effect not found')
 
   // Type assertion to access nested fields
-  const effectWithProject = effect as any
+  const effectWithProject = effect as unknown as { project_id: string; projects: { user_id: string } }
   if (effectWithProject.projects.user_id !== user.id) {
     throw new Error('Unauthorized')
   }
@@ -261,8 +296,8 @@ export async function createEffectFromMediaFile(
   if (!kind) throw new Error('Unsupported media type')
 
   // 4. Get metadata
-  const metadata = mediaFile.metadata as any
-  const rawDuration = (metadata.duration || 5) * 1000 // Default 5s for images
+  const metadata = mediaFile.metadata as Record<string, unknown>
+  const rawDuration = ((metadata.duration as number | undefined) || 5) * 1000 // Default 5s for images
 
   // 5. Calculate optimal position and track if not provided
   const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
@@ -276,7 +311,7 @@ export async function createEffectFromMediaFile(
   }
 
   // 6. Create effect with appropriate properties
-  const effectData: any = {
+  const effectData = {
     kind,
     track,
     start_at_position: position,
@@ -286,10 +321,10 @@ export async function createEffectFromMediaFile(
     media_file_id: mediaFileId,
     file_hash: mediaFile.file_hash,
     name: mediaFile.filename,
-    thumbnail: kind === 'video' ? (metadata.thumbnail || '') :
+    thumbnail: kind === 'video' ? ((metadata.thumbnail as string | undefined) || '') :
                kind === 'image' ? (mediaFile.storage_path || '') : '',
-    properties: createDefaultProperties(kind, metadata),
-  }
+    properties: createDefaultProperties(kind, metadata) as unknown as VideoImageProperties | AudioProperties | TextProperties,
+  } as Omit<Effect, 'id' | 'project_id' | 'created_at' | 'updated_at'>
 
   // 7. Create effect in database
   return createEffect(projectId, effectData)
@@ -298,10 +333,10 @@ export async function createEffectFromMediaFile(
 /**
  * Create default properties based on media type
  */
-function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: any): any {
+function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: Record<string, unknown>): Record<string, unknown> {
   if (kind === 'video' || kind === 'image') {
-    const width = metadata.width || 1920
-    const height = metadata.height || 1080
+    const width = (metadata.width as number | undefined) || 1920
+    const height = (metadata.height as number | undefined) || 1080
 
     return {
       rect: {
@@ -319,16 +354,162 @@ function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: an
           y: height / 2
         }
       },
-      raw_duration: (metadata.duration || 5) * 1000,
-      frames: metadata.frames || Math.floor((metadata.duration || 5) * (metadata.fps || 30))
+      raw_duration: ((metadata.duration as number | undefined) || 5) * 1000,
+      frames: (metadata.frames as number | undefined) || Math.floor(((metadata.duration as number | undefined) || 5) * ((metadata.fps as number | undefined) || 30))
     }
   } else if (kind === 'audio') {
     return {
       volume: 1.0,
       muted: false,
-      raw_duration: metadata.duration * 1000
+      raw_duration: ((metadata.duration as number | undefined) || 0) * 1000
     }
   }
 
   return {}
+}
+
+// ======================================
+// Text Effect CRUD - T076 (Phase 7)
+// ======================================
+
+/**
+ * Create text effect with full styling support
+ * Constitutional FR-007 compliance
+ */
+export async function createTextEffect(
+  projectId: string,
+  text: string,
+  position?: { x: number; y: number },
+  track?: number
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effects for smart placement
+  const existingEffects = await getEffects(projectId)
+
+  // Calculate optimal position
+  const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
+  const optimal = findPlaceForNewEffect(existingEffects, 3)
+
+  const textEffect = {
+    kind: 'text' as const,
+    track: track ?? optimal.track,
+    start_at_position: position?.x ?? optimal.position,
+    duration: 5000,  // Default 5 seconds
+    start: 0,
+    end: 5000,
+    properties: {
+      text: text || 'Default text',
+      fontFamily: 'Arial',
+      fontSize: 38,
+      fontStyle: 'normal' as const,
+      fontVariant: 'normal' as const,
+      fontWeight: 'normal' as const,
+      align: 'center' as const,
+      fill: ['#FFFFFF'],
+      fillGradientType: 0 as 0 | 1,
+      fillGradientStops: [],
+      rect: {
+        width: 400,
+        height: 100,
+        scaleX: 1,
+        scaleY: 1,
+        position_on_canvas: {
+          x: position?.x ?? 960,  // Center X
+          y: position?.y ?? 540   // Center Y
+        },
+        rotation: 0,
+        pivot: { x: 0, y: 0 }
+      },
+      stroke: '#FFFFFF',
+      strokeThickness: 0,
+      lineJoin: 'miter' as const,
+      miterLimit: 10,
+      textBaseline: 'alphabetic' as const,
+      letterSpacing: 0,
+      dropShadow: false,
+      dropShadowDistance: 5,
+      dropShadowBlur: 0,
+      dropShadowAlpha: 1,
+      dropShadowAngle: 0.5,
+      dropShadowColor: '#000000',
+      breakWords: false,
+      wordWrap: false,
+      lineHeight: 0,
+      leading: 0,
+      wordWrapWidth: 100,
+      whiteSpace: 'pre' as const
+    }
+  } as Omit<Effect, 'id' | 'project_id' | 'created_at' | 'updated_at'>
+
+  return createEffect(projectId, textEffect)
+}
+
+/**
+ * Update text effect styling
+ * Supports all TextStyleOptions from TextManager
+ */
+export async function updateTextEffectStyle(
+  effectId: string,
+  styleUpdates: Partial<TextProperties>
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effect
+  const { data: existingEffect } = await supabase
+    .from('effects')
+    .select('properties')
+    .eq('id', effectId)
+    .single()
+
+  if (!existingEffect) throw new Error('Effect not found')
+
+  const updatedProperties = {
+    ...(existingEffect.properties as TextProperties),
+    ...styleUpdates
+  }
+
+  return updateEffect(effectId, { properties: updatedProperties as unknown as TextProperties })
+}
+
+/**
+ * Batch update text positions (for drag operations)
+ */
+export async function updateTextPosition(
+  effectId: string,
+  position: { x: number; y: number },
+  rotation?: number,
+  scale?: { x: number; y: number }
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get existing effect
+  const { data: existingEffect } = await supabase
+    .from('effects')
+    .select('properties')
+    .eq('id', effectId)
+    .single()
+
+  if (!existingEffect) throw new Error('Effect not found')
+
+  const props = existingEffect.properties as TextProperties
+  const updatedRect = {
+    ...props.rect,
+    position_on_canvas: position,
+    ...(rotation !== undefined && { rotation }),
+    ...(scale && { scaleX: scale.x, scaleY: scale.y })
+  }
+
+  return updateEffect(effectId, {
+    properties: {
+      ...props,
+      rect: updatedRect
+    } as unknown as TextProperties
+  })
 }

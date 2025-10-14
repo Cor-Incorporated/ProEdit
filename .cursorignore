@@ -1,0 +1,29 @@
+# Archive folder
+.archive/
+
+# Old reports (if any remain)
+*VERIFICATION_REPORT*.md
+*IMPLEMENTATION_DIRECTIVE*.md
+*PHASE*_*.md
+
+# Vendor code (omniclip reference)
+vendor/omniclip/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# Large binary files
+*.mp4
+*.mov
+*.webm
+*.avi
+
+# Test files
+coverage/
+.nyc_output/

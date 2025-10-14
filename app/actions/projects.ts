@@ -173,3 +173,94 @@ export async function deleteProject(projectId: string): Promise<void> {
 
   revalidatePath("/editor");
 }
+
+/**
+ * Phase 9: Save project data (auto-save)
+ * Constitutional Requirement: FR-009 "System MUST auto-save every 5 seconds"
+ */
+export async function saveProject(
+  projectId: string,
+  projectData: {
+    effects?: unknown[];
+    tracks?: unknown[];
+    mediaFiles?: unknown[];
+    lastModified: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Update project with new data
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        updated_at: projectData.lastModified,
+        // Store project state in metadata (or separate tables)
+        // For now, we'll use a JSONB column if available
+      })
+      .eq("id", projectId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Save project error:", error);
+      return { success: false, error: error.message };
+    }
+
+    // Update effects if provided
+    // P0-1 FIX: Implement actual effect persistence (FR-009 compliance)
+    if (projectData.effects && projectData.effects.length > 0) {
+      // Delete existing effects for this project
+      const { error: deleteError } = await supabase
+        .from("effects")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (deleteError) {
+        console.error("[SaveProject] Failed to delete existing effects:", deleteError);
+        return { success: false, error: `Failed to delete effects: ${deleteError.message}` };
+      }
+
+      // Insert new effects
+      const effectsToInsert = (projectData.effects as any[]).map((effect) => ({
+        id: effect.id,
+        project_id: projectId,
+        kind: effect.kind,
+        track: effect.track,
+        start_at_position: effect.start_at_position,
+        duration: effect.duration,
+        start_time: effect.start_time,
+        end_time: effect.end_time,
+        media_file_id: effect.media_file_id || null,
+        properties: effect.properties || {},
+      }));
+
+      const { error: insertError } = await supabase
+        .from("effects")
+        .insert(effectsToInsert);
+
+      if (insertError) {
+        console.error("[SaveProject] Failed to insert effects:", insertError);
+        return { success: false, error: `Failed to save effects: ${insertError.message}` };
+      }
+
+      console.log(`[SaveProject] Successfully saved ${projectData.effects.length} effects`);
+    }
+
+    revalidatePath(`/editor/${projectId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Save project exception:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

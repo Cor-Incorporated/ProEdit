@@ -52,7 +52,7 @@ export async function uploadMedia(
       file_size: file.size,
       mime_type: file.type,
       storage_path: storagePath,
-      metadata: metadata as any,
+      metadata: metadata as unknown as Record<string, unknown>,
     })
     .select()
     .single()
@@ -189,4 +189,75 @@ export async function getMediaSignedUrl(
   }
 
   return data.signedUrl
+}
+
+/**
+ * Get signed URL for media file by media file ID
+ * Used by compositor to access media files securely
+ * @param mediaFileId Media file ID
+ * @returns Promise<string> Signed URL
+ */
+export async function getSignedUrl(mediaFileId: string): Promise<string> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get media file info
+  const { data: media } = await supabase
+    .from('media_files')
+    .select('storage_path')
+    .eq('id', mediaFileId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!media) throw new Error('Media not found')
+
+  // Get signed URL for the storage path
+  return getMediaSignedUrl(media.storage_path)
+}
+
+/**
+ * Get File object from media file hash
+ * Used by ExportController to fetch source media files for export
+ * Ported from omniclip export workflow
+ * @param fileHash SHA-256 hash of the media file
+ * @returns Promise<File> File object containing the media data
+ * @throws Error if file not found or fetch fails
+ */
+export async function getMediaFileByHash(fileHash: string): Promise<File> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Get media file by hash
+  const { data: media, error } = await supabase
+    .from('media_files')
+    .select('id, filename, mime_type, storage_path')
+    .eq('user_id', user.id)
+    .eq('file_hash', fileHash)
+    .single()
+
+  if (error || !media) {
+    throw new Error(`Media file not found for hash: ${fileHash}`)
+  }
+
+  // 2. Get signed URL for secure access
+  const signedUrl = await getSignedUrl(media.id)
+
+  // 3. Fetch file as Blob
+  const response = await fetch(signedUrl)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch media file: ${response.statusText}`)
+  }
+
+  const blob = await response.blob()
+
+  // 4. Convert Blob to File object
+  const file = new File([blob], media.filename, {
+    type: media.mime_type,
+  })
+
+  return file
 }
