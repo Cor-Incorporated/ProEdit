@@ -43,3 +43,6 @@ next-env.d.ts
 *.tmp
 *.temp
 .scratch/
+
+# Vendor dependencies (omniclip reference)
+vendor/

@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Vercel deployment optimization
+  outputFileTracingRoot: process.cwd(),
+  
   // FFmpeg.wasmのSharedArrayBuffer対応
   async headers() {
     return [
