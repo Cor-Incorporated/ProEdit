@@ -109,8 +109,17 @@ export class AudioManager {
     this.audios.delete(effectId)
   }
 
+  /**
+   * FIXED: Added error handling to prevent cleanup failures
+   */
   destroy(): void {
-    this.audios.forEach((_, id) => this.remove(id))
+    this.audios.forEach((_, id) => {
+      try {
+        this.remove(id)
+      } catch (error) {
+        console.warn(`AudioManager: Error removing audio ${id}:`, error)
+      }
+    })
     this.audios.clear()
   }
 }

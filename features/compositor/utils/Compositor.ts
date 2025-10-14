@@ -24,6 +24,12 @@ export class Compositor {
   private timecode = 0
   private animationFrameId: number | null = null
 
+  // FIXED: Store all effects for playback loop access
+  private allEffects: Effect[] = []
+  
+  // Track visible effect IDs to detect changes
+  private visibleEffectIds = new Set<string>()
+
   // Currently visible effects
   private currentlyPlayedEffects = new Map<string, Effect>()
 
@@ -68,6 +74,51 @@ export class Compositor {
    */
   setOnFpsUpdate(callback: (fps: number) => void): void {
     this.onFpsUpdate = callback
+  }
+
+  /**
+   * Set effects for playback
+   * FIXED: Store effects internally so playback loop can access them
+   */
+  setEffects(effects: Effect[]): void {
+    this.allEffects = effects
+    // Immediately check if recompose is needed
+    void this.recomposeIfNeeded()
+  }
+
+  /**
+   * Recompose only if visible effects changed
+   * FIXED: Performance optimization - only recompose when necessary
+   */
+  private async recomposeIfNeeded(): Promise<void> {
+    try {
+      // Get effects visible at current timecode
+      const visibleEffects = this.getEffectsRelativeToTimecode(
+        this.allEffects,
+        this.timecode
+      )
+      const newIds = new Set(visibleEffects.map(e => e.id))
+
+      // Only recompose if the set of visible effects changed
+      if (!this.setsEqual(this.visibleEffectIds, newIds)) {
+        await this.composeEffects(this.allEffects, this.timecode)
+        this.visibleEffectIds = newIds
+      }
+    } catch (error) {
+      logger.error('Compositor: Recompose failed:', error)
+      // Keep going - don't crash the playback loop
+    }
+  }
+
+  /**
+   * Compare two sets for equality
+   */
+  private setsEqual(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) return false
+    for (const item of a) {
+      if (!b.has(item)) return false
+    }
+    return true
   }
 
   /**
@@ -155,6 +206,7 @@ export class Compositor {
   /**
    * Main playback loop
    * Ported from omniclip:87-98
+   * FIXED: Recompose effects every frame to update visibility based on timecode
    */
   private startPlaybackLoop = (): void => {
     if (!this.isPlaying) return
@@ -166,6 +218,12 @@ export class Compositor {
 
     // Update timecode
     this.timecode += elapsedTime
+
+    // FIXED: Only recompose if visible effects changed (performance optimization)
+    // Prevents unnecessary composeEffects calls (60fps → ~2-5fps)
+    if (this.allEffects.length > 0) {
+      void this.recomposeIfNeeded()
+    }
 
     // Notify timecode change
     if (this.onTimecodeChange) {

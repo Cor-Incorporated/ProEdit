@@ -1,35 +1,34 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Timeline } from '@/features/timeline/components/Timeline'
-import { MediaLibrary } from '@/features/media/components/MediaLibrary'
-import { Canvas } from '@/features/compositor/components/Canvas'
-import { PlaybackControls } from '@/features/compositor/components/PlaybackControls'
-import { FPSCounter } from '@/features/compositor/components/FPSCounter'
-import { ExportDialog } from '@/features/export/components/ExportDialog'
-import { Button } from '@/components/ui/button'
-import { PanelRightOpen, Download, Type } from 'lucide-react'
-import { Project } from '@/types/project'
-import { TextEffect } from '@/types/effects'
-import { TextEditor } from '@/features/effects/components/TextEditor'
 import { createTextEffect, updateTextEffectStyle } from '@/app/actions/effects'
+import { getMediaFileByHash, getSignedUrl } from '@/app/actions/media'
+import { Button } from '@/components/ui/button'
+import { Canvas } from '@/features/compositor/components/Canvas'
+import { FPSCounter } from '@/features/compositor/components/FPSCounter'
+import { PlaybackControls } from '@/features/compositor/components/PlaybackControls'
 import { Compositor } from '@/features/compositor/utils/Compositor'
+import { TextEditor } from '@/features/effects/components/TextEditor'
+import { ExportDialog } from '@/features/export/components/ExportDialog'
+import { ExportQuality } from '@/features/export/types'
+import { downloadFile } from '@/features/export/utils/download'
+import { ExportController } from '@/features/export/utils/ExportController'
+import { MediaLibrary } from '@/features/media/components/MediaLibrary'
+import { Timeline } from '@/features/timeline/components/Timeline'
+import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
 import { useCompositorStore } from '@/stores/compositor'
 import { useTimelineStore } from '@/stores/timeline'
-import { getSignedUrl } from '@/app/actions/media'
-import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
-import { ExportController } from '@/features/export/utils/ExportController'
-import { ExportQuality } from '@/features/export/types'
-import { getMediaFileByHash } from '@/app/actions/media'
-import { downloadFile } from '@/features/export/utils/download'
-import { toast } from 'sonner'
+import { TextEffect } from '@/types/effects'
+import { Project } from '@/types/project'
+import { Download, PanelRightOpen, Type } from 'lucide-react'
 import * as PIXI from 'pixi.js'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 // Phase 9: Auto-save imports (AutoSaveManager managed by Zustand)
-import { SaveStatus } from '@/features/timeline/utils/autosave'
-import { RealtimeSyncManager, ConflictData } from '@/lib/supabase/sync'
-import { SaveIndicatorCompact } from '@/components/SaveIndicator'
 import { ConflictResolutionDialog } from '@/components/ConflictResolutionDialog'
 import { RecoveryModal } from '@/components/RecoveryModal'
+import { SaveIndicatorCompact } from '@/components/SaveIndicator'
+import { SaveStatus } from '@/features/timeline/utils/autosave'
+import { ConflictData, RealtimeSyncManager } from '@/lib/supabase/sync'
 
 interface EditorClientProps {
   project: Project
@@ -183,11 +182,14 @@ export function EditorClient({ project }: EditorClientProps) {
   }
 
   // Sync effects with compositor when they change
+  // FIXED: Let Compositor handle playback loop, React only updates on effects changes
   useEffect(() => {
-    if (compositorRef.current && effects.length > 0) {
-      compositorRef.current.composeEffects(effects, timecode)
-    }
-  }, [effects, timecode])
+    if (!compositorRef.current) return
+    
+    // Store effects in Compositor so playback loop can access them
+    // This allows the loop to update effect visibility every frame
+    compositorRef.current.setEffects(effects)
+  }, [effects])
 
   // Handle export with progress callback
   const handleExport = async (

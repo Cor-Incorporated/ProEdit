@@ -1,5 +1,5 @@
-import * as PIXI from 'pixi.js'
 import { VideoEffect } from '@/types/effects'
+import * as PIXI from 'pixi.js'
 
 /**
  * VideoManager - Manages video effects on PIXI canvas
@@ -40,7 +40,7 @@ export class VideoManager {
 
       // Create PIXI texture from video (omniclip:60-62)
       const texture = PIXI.Texture.from(element)
-      // Note: PIXI.js v8 doesn't have autoPlay property, handled by video element
+      // Note: PIXI.js v7 doesn't have autoPlay property, handled by video element
 
       // Create sprite (omniclip:63-73)
       const sprite = new PIXI.Sprite(texture)
@@ -180,9 +180,16 @@ export class VideoManager {
 
   /**
    * Cleanup all videos
+   * FIXED: Added error handling to prevent cleanup failures
    */
   destroy(): void {
-    this.videos.forEach((_, id) => this.remove(id))
+    this.videos.forEach((_, id) => {
+      try {
+        this.remove(id)
+      } catch (error) {
+        console.warn(`VideoManager: Error removing video ${id}:`, error)
+      }
+    })
     this.videos.clear()
   }
 

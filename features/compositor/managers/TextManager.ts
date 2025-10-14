@@ -5,18 +5,18 @@
  * Constitutional FR-007 compliance - Text Overlay Creation
  */
 
-import * as PIXI from 'pixi.js'
 import { TextEffect } from '@/types/effects'
 import type {
-  TextStyleAlign,
-  TextStyleFontStyle,
-  TextStyleFontVariant,
-  TextStyleFontWeight,
-  TextStyleTextBaseline,
-  TextStyleWhiteSpace,
+    TextStyleAlign,
+    TextStyleFontStyle,
+    TextStyleFontVariant,
+    TextStyleFontWeight,
+    TextStyleTextBaseline,
+    TextStyleWhiteSpace,
 } from 'pixi.js'
+import * as PIXI from 'pixi.js'
 
-// TEXT_GRADIENT enum values for PIXI v8
+// TEXT_GRADIENT enum values for PIXI v7
 type TEXT_GRADIENT = 0 | 1 // 0: VERTICAL, 1: HORIZONTAL
 
 // Font metadata for local font access API
@@ -677,14 +677,39 @@ export class TextManager extends Map<
   /**
    * Cleanup
    * Port from omniclip Line 550-554
+   * FIXED: Safe cleanup without calling sprite.destroy() to prevent cancelResize errors
+   * PIXI v7 has a known issue where resize observer cleanup fails in production builds
    */
   destroy(): void {
     if (this.#setPermissionStatus && this.#permissionStatus) {
       this.#permissionStatus.removeEventListener('change', this.#setPermissionStatus)
     }
-    // Clean up all sprites
+    
+    // FIXED: Safe cleanup without sprite.destroy()
+    // PIXI v7 resize observer cleanup is unreliable in production
     this.forEach((item) => {
-      item.sprite.destroy()
+      try {
+        // Remove from stage first
+        if (item.sprite.parent) {
+          item.sprite.parent.removeChild(item.sprite)
+        }
+        // Remove event listeners
+        item.sprite.removeAllListeners()
+        // Explicitly destroy texture to prevent memory leaks
+        if (item.sprite.texture && item.sprite.texture !== PIXI.Texture.EMPTY) {
+          try {
+            item.sprite.texture.destroy(true)
+          } catch (err) {
+            // Texture destroy may fail, but that's acceptable
+            console.warn('TextManager: Texture destroy warning (safe to ignore):', err)
+          }
+        }
+        // Clear text content to free memory
+        item.sprite.text = ''
+        // DO NOT call item.sprite.destroy() - causes cancelResize error in production
+      } catch (error) {
+        console.warn('TextManager: Sprite cleanup error:', error)
+      }
     })
     this.clear()
   }
