@@ -18,6 +18,9 @@ export class AutoSaveManager {
   private onStatusChange?: (status: SaveStatus) => void;
   // P0-2 FIX: Add mutex to prevent race conditions
   private isSaving = false;
+  // Security: Rate limiting to prevent database spam
+  private lastSaveTime = 0;
+  private readonly MIN_SAVE_INTERVAL = 1000; // Minimum 1 second between saves
 
   constructor(
     projectId: string,
@@ -71,11 +74,20 @@ export class AutoSaveManager {
    * Save immediately
    * Handles both online and offline scenarios
    * P0-2 FIX: Prevent concurrent saves with mutex
+   * Security: Rate limiting to prevent database spam
    */
   async saveNow(): Promise<void> {
     // P0-2 FIX: Check if already saving
     if (this.isSaving) {
       console.log("[AutoSave] Save already in progress, skipping");
+      return;
+    }
+
+    // Security: Rate limiting check
+    const now = Date.now();
+    const timeSinceLastSave = now - this.lastSaveTime;
+    if (timeSinceLastSave < this.MIN_SAVE_INTERVAL) {
+      console.log(`[AutoSave] Rate limit: ${timeSinceLastSave}ms since last save, minimum ${this.MIN_SAVE_INTERVAL}ms required`);
       return;
     }
 
@@ -88,6 +100,7 @@ export class AutoSaveManager {
 
     // P0-2 FIX: Set mutex before starting
     this.isSaving = true;
+    this.lastSaveTime = now; // Update last save time
 
     try {
       this.onStatusChange?.("saving");

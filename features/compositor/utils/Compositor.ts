@@ -336,14 +336,34 @@ export class Compositor {
 
   /**
    * Destroy compositor
+   * Fixed: Proper cleanup to prevent memory leaks
    */
   destroy(): void {
     this.pause()
+
+    // Stop animation frame if running
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId)
+      this.animationFrameId = null
+    }
+
+    // Clean up all managers
     this.videoManager.destroy()
     this.imageManager.destroy()
     this.audioManager.destroy()
-    this.textManager.destroy()
+    this.textManager.clear()
+
+    // Clear all effects
     this.currentlyPlayedEffects.clear()
+
+    // Remove all children from stage
+    this.app.stage.removeChildren()
+
+    // Destroy PIXI application with full cleanup
+    this.app.destroy(true, {
+      children: true,  // Destroy all children
+      texture: true    // Destroy textures
+    })
   }
 
   /**

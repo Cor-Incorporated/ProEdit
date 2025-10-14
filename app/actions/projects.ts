@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Project, ProjectSettings } from "@/types/project";
+import { EffectBaseSchema } from "@/lib/validation/effect-schemas";
 
 export async function getProjects(): Promise<Project[]> {
   const supabase = await createClient();
@@ -23,7 +24,7 @@ export async function getProjects(): Promise<Project[]> {
 
   if (error) {
     console.error("Get projects error:", error);
-    throw new Error(error.message);
+    throw new Error(`Failed to get projects: ${error.message}`, { cause: error });
   }
 
   return data as Project[];
@@ -52,7 +53,7 @@ export async function getProject(projectId: string): Promise<Project | null> {
       return null;
     }
     console.error("Get project error:", error);
-    throw new Error(error.message);
+    throw new Error(`Failed to get project ${projectId}: ${error.message}`, { cause: error });
   }
 
   return data as Project;
@@ -99,7 +100,7 @@ export async function createProject(name: string): Promise<Project> {
 
   if (error) {
     console.error("Create project error:", error);
-    throw new Error(error.message);
+    throw new Error(`Failed to create project "${name}": ${error.message}`, { cause: error });
   }
 
   revalidatePath("/editor");
@@ -141,7 +142,7 @@ export async function updateProject(
 
   if (error) {
     console.error("Update project error:", error);
-    throw new Error(error.message);
+    throw new Error(`Failed to update project ${projectId}: ${error.message}`, { cause: error });
   }
 
   revalidatePath("/editor");
@@ -168,7 +169,7 @@ export async function deleteProject(projectId: string): Promise<void> {
 
   if (error) {
     console.error("Delete project error:", error);
-    throw new Error(error.message);
+    throw new Error(`Failed to delete project ${projectId}: ${error.message}`, { cause: error });
   }
 
   revalidatePath("/editor");
@@ -229,18 +230,30 @@ export async function saveProject(
       }
 
       // Insert new effects
-      const effectsToInsert = (projectData.effects as any[]).map((effect) => ({
-        id: effect.id,
-        project_id: projectId,
-        kind: effect.kind,
-        track: effect.track,
-        start_at_position: effect.start_at_position,
-        duration: effect.duration,
-        start_time: effect.start_time,
-        end_time: effect.end_time,
-        media_file_id: effect.media_file_id || null,
-        properties: effect.properties || {},
-      }));
+      // Validate each effect before insertion
+      const effectsToInsert = projectData.effects.map((effect: any) => {
+        const validated = EffectBaseSchema.parse({
+          kind: effect.kind,
+          track: effect.track,
+          start_at_position: effect.start_at_position,
+          duration: effect.duration,
+          start: effect.start,
+          end: effect.end,
+          media_file_id: effect.media_file_id || null,
+        });
+        return {
+          id: effect.id, // ID is not validated, it's preserved from the effect
+          project_id: projectId,
+          kind: validated.kind,
+          track: validated.track,
+          start_at_position: validated.start_at_position,
+          duration: validated.duration,
+          start: validated.start,  // Fixed: Use 'start' instead of 'start_time'
+          end: validated.end,      // Fixed: Use 'end' instead of 'end_time'
+          media_file_id: validated.media_file_id || null,
+          properties: effect.properties || {},
+        };
+      });
 
       const { error: insertError } = await supabase
         .from("effects")

@@ -5,6 +5,9 @@ import { uploadMediaFile, deleteMediaFile } from '@/lib/supabase/utils'
 import { revalidatePath } from 'next/cache'
 import { MediaFile } from '@/types/media'
 
+// Security: Maximum file size (500MB)
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+
 /**
  * Upload media file with hash-based deduplication
  * Returns existing file if hash matches (FR-012 compliance)
@@ -24,6 +27,16 @@ export async function uploadMedia(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
+
+  // Security: Validate file size before upload
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`)
+  }
+
+  // Security: Validate file size is positive
+  if (file.size <= 0) {
+    throw new Error('Invalid file size')
+  }
 
   // CRITICAL: Hash-based deduplication check (FR-012)
   // If file with same hash exists for this user, reuse it

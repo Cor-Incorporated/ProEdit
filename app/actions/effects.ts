@@ -68,7 +68,7 @@ export async function createEffect(
 
   if (error) {
     console.error('Create effect error:', error)
-    throw new Error(error.message)
+    throw new Error(`Failed to create effect: ${error.message}`, { cause: error })
   }
 
   revalidatePath(`/editor/${projectId}`)
@@ -106,7 +106,7 @@ export async function getEffects(projectId: string): Promise<Effect[]> {
 
   if (error) {
     console.error('Get effects error:', error)
-    throw new Error(error.message)
+    throw new Error(`Failed to get effects for project ${projectId}: ${error.message}`, { cause: error })
   }
 
   return data as Effect[]
@@ -174,7 +174,7 @@ export async function updateEffect(
 
   if (error) {
     console.error('Update effect error:', error)
-    throw new Error(error.message)
+    throw new Error(`Failed to update effect ${effectId}: ${error.message}`, { cause: error })
   }
 
   revalidatePath('/editor')
@@ -215,7 +215,7 @@ export async function deleteEffect(effectId: string): Promise<void> {
 
   if (error) {
     console.error('Delete effect error:', error)
-    throw new Error(error.message)
+    throw new Error(`Failed to delete effect ${effectId}: ${error.message}`, { cause: error })
   }
 
   revalidatePath('/editor')
