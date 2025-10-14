@@ -145,20 +145,27 @@ export async function updateEffect(
   // P0-3 FIX: Validate properties if provided
   let validatedUpdates = { ...updates };
   if (updates.properties) {
-    // Get effect to know its kind
-    const { data: effectData } = await supabase
+    // Get effect to know its kind (P0-FIX: Added error handling)
+    const { data: effectData, error: effectError } = await supabase
       .from('effects')
       .select('kind')
       .eq('id', effectId)
       .single();
 
-    if (effectData) {
-      const validatedProperties = validatePartialEffectProperties(effectData.kind, updates.properties);
-      validatedUpdates = {
-        ...updates,
-        properties: validatedProperties as VideoImageProperties | AudioProperties | TextProperties,
-      };
+    if (effectError) {
+      console.error('[UpdateEffect] Failed to fetch effect kind:', effectError);
+      throw new Error(`Failed to validate effect properties: ${effectError.message}`);
     }
+
+    if (!effectData) {
+      throw new Error('Effect not found for validation');
+    }
+
+    const validatedProperties = validatePartialEffectProperties(effectData.kind, updates.properties);
+    validatedUpdates = {
+      ...updates,
+      properties: validatedProperties as VideoImageProperties | AudioProperties | TextProperties,
+    };
   }
 
   // Update effect

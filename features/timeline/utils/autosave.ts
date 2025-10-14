@@ -1,11 +1,13 @@
 /**
  * Auto-save Manager
  * Constitutional Requirement: FR-009 "System MUST auto-save every 5 seconds"
+ * P0-FIX: Using centralized logger for production-safe logging
  */
 
 import { saveProject } from "@/app/actions/projects";
 import { useTimelineStore } from "@/stores/timeline";
 import { useMediaStore } from "@/stores/media";
+import { logger } from "@/lib/utils/logger";
 
 export class AutoSaveManager {
   private debounceTimer: NodeJS.Timeout | null = null;
@@ -45,7 +47,7 @@ export class AutoSaveManager {
       void this.saveNow();
     }, this.AUTOSAVE_INTERVAL);
 
-    console.log("[AutoSave] Started with 5s interval (FR-009 compliant)");
+    logger.info("[AutoSave] Started with 5s interval (FR-009 compliant)");
   }
 
   /**
@@ -55,17 +57,24 @@ export class AutoSaveManager {
     if (this.autoSaveInterval) {
       clearInterval(this.autoSaveInterval);
       this.autoSaveInterval = null;
-      console.log("[AutoSave] Stopped");
+      logger.info("[AutoSave] Stopped");
     }
   }
 
   /**
    * Trigger debounced save
    * Used for immediate changes (e.g., user edits)
+   * P0-FIX: Added mutex check to prevent race conditions
    */
   triggerSave(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
+    }
+
+    // P0-FIX: Check mutex before scheduling save
+    if (this.isSaving) {
+      logger.debug('[AutoSave] Debounced save skipped - save already in progress');
+      return;
     }
 
     this.debounceTimer = setTimeout(() => {
@@ -83,7 +92,7 @@ export class AutoSaveManager {
     // P0-2 FIX: Check if already saving
     if (this.isSaving) {
       this.saveConflictCount++;
-      console.warn(`[AutoSave] Save conflict #${this.saveConflictCount} - Save already in progress, skipping`);
+      logger.warn(`[AutoSave] Save conflict #${this.saveConflictCount} - Save already in progress, skipping`);
       return;
     }
 
@@ -92,12 +101,12 @@ export class AutoSaveManager {
     const timeSinceLastSave = now - this.lastSaveTime;
     if (timeSinceLastSave < this.MIN_SAVE_INTERVAL) {
       this.rateLimitHitCount++;
-      console.log(`[AutoSave] Rate limit hit #${this.rateLimitHitCount}: ${timeSinceLastSave}ms since last save, minimum ${this.MIN_SAVE_INTERVAL}ms required`);
+      logger.debug(`[AutoSave] Rate limit hit #${this.rateLimitHitCount}: ${timeSinceLastSave}ms since last save, minimum ${this.MIN_SAVE_INTERVAL}ms required`);
       return;
     }
 
     if (!this.isOnline) {
-      console.log("[AutoSave] Offline - queueing save operation");
+      logger.info("[AutoSave] Offline - queueing save operation");
       this.offlineQueue.push(() => this.performSave());
       this.onStatusChange?.("offline");
       return;
@@ -111,9 +120,9 @@ export class AutoSaveManager {
       this.onStatusChange?.("saving");
       await this.performSave();
       this.onStatusChange?.("saved");
-      console.log("[AutoSave] Save successful");
+      logger.debug("[AutoSave] Save successful");
     } catch (error) {
-      console.error("[AutoSave] Save failed:", error);
+      logger.error("[AutoSave] Save failed:", error);
       this.onStatusChange?.("error");
     } finally {
       // P0-2 FIX: Always release mutex
@@ -149,7 +158,7 @@ export class AutoSaveManager {
   private async handleOfflineQueue(): Promise<void> {
     if (this.offlineQueue.length === 0) return;
 
-    console.log(
+    logger.info(
       `[AutoSave] Processing ${this.offlineQueue.length} offline saves`
     );
 
@@ -163,9 +172,9 @@ export class AutoSaveManager {
 
       this.offlineQueue = [];
       this.onStatusChange?.("saved");
-      console.log("[AutoSave] Offline queue processed successfully");
+      logger.info("[AutoSave] Offline queue processed successfully");
     } catch (error) {
-      console.error("[AutoSave] Failed to process offline queue:", error);
+      logger.error("[AutoSave] Failed to process offline queue:", error);
       this.onStatusChange?.("error");
     }
   }
@@ -179,13 +188,13 @@ export class AutoSaveManager {
     this.isOnline = window.navigator.onLine;
 
     window.addEventListener("online", () => {
-      console.log("[AutoSave] Connection restored");
+      logger.info("[AutoSave] Connection restored");
       this.isOnline = true;
       void this.handleOfflineQueue();
     });
 
     window.addEventListener("offline", () => {
-      console.log("[AutoSave] Connection lost");
+      logger.info("[AutoSave] Connection lost");
       this.isOnline = false;
       this.onStatusChange?.("offline");
     });
@@ -217,7 +226,7 @@ export class AutoSaveManager {
     // Log metrics on cleanup for debugging
     const metrics = this.getMetrics();
     if (metrics.saveConflicts > 0 || metrics.rateLimitHits > 0) {
-      console.log("[AutoSave] Session metrics:", metrics);
+      logger.info("[AutoSave] Session metrics:", metrics);
     }
 
     // Save any pending changes before cleanup

@@ -4,6 +4,7 @@ import { VideoManager } from '../managers/VideoManager'
 import { ImageManager } from '../managers/ImageManager'
 import { AudioManager } from '../managers/AudioManager'
 import { TextManager } from '../managers/TextManager'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * Compositor - Main compositing engine
@@ -52,7 +53,7 @@ export class Compositor {
     this.audioManager = new AudioManager(getMediaFileUrl)
     this.textManager = new TextManager(app, onTextEffectUpdate)
 
-    console.log('Compositor: Initialized with TextManager')
+    logger.debug('Compositor: Initialized with TextManager')
   }
 
   /**
@@ -82,7 +83,7 @@ export class Compositor {
     // Start playback loop
     this.startPlaybackLoop()
 
-    console.log('Compositor: Play')
+    logger.debug('Compositor: Play')
   }
 
   /**
@@ -110,7 +111,7 @@ export class Compositor {
     this.videoManager.pauseAll(videoIds)
     this.audioManager.pauseAll(audioIds)
 
-    console.log('Compositor: Pause')
+    logger.debug('Compositor: Pause')
   }
 
   /**
@@ -119,7 +120,7 @@ export class Compositor {
   stop(): void {
     this.pause()
     this.seek(0)
-    console.log('Compositor: Stop')
+    logger.debug('Compositor: Stop')
   }
 
   /**
@@ -336,7 +337,7 @@ export class Compositor {
 
   /**
    * Destroy compositor
-   * Fixed: Proper cleanup to prevent memory leaks
+   * P0-FIX: Proper cleanup to prevent memory leaks
    */
   destroy(): void {
     this.pause()
@@ -347,7 +348,7 @@ export class Compositor {
       this.animationFrameId = null
     }
 
-    // Clean up all managers
+    // Clean up all managers (in correct order)
     this.videoManager.destroy()
     this.imageManager.destroy()
     this.audioManager.destroy()
@@ -356,14 +357,18 @@ export class Compositor {
     // Clear all effects
     this.currentlyPlayedEffects.clear()
 
-    // Remove all children from stage
+    // Remove all children from stage before destroying
     this.app.stage.removeChildren()
+    this.app.stage.destroy({ children: true, texture: true })
 
-    // Destroy PIXI application with full cleanup
+    // Destroy PIXI application with full cleanup (PIXI v7 compatible)
     this.app.destroy(true, {
-      children: true,  // Destroy all children
-      texture: true    // Destroy textures
+      children: true,
+      texture: true,
+      textureSource: true,
     })
+
+    logger.info('Compositor: Cleaned up all resources')
   }
 
   /**

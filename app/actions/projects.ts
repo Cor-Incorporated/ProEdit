@@ -230,9 +230,16 @@ export async function saveProject(
       }
 
       // Insert new effects
-      // Validate each effect before insertion
+      // Validate each effect before insertion (P0-FIX: Added ID validation to prevent SQL injection)
       const effectsToInsert = projectData.effects.map((effect: unknown) => {
         const effectData = effect as Record<string, unknown>;
+        
+        // Validate ID to prevent SQL injection
+        const effectId = typeof effectData.id === 'string' ? effectData.id : '';
+        if (!effectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(effectId)) {
+          throw new Error(`Invalid effect ID format: ${effectId}`);
+        }
+        
         const validated = EffectBaseSchema.parse({
           kind: effectData.kind,
           track: effectData.track,
@@ -243,7 +250,7 @@ export async function saveProject(
           media_file_id: effectData.media_file_id || null,
         });
         return {
-          id: effectData.id, // ID is not validated, it's preserved from the effect
+          id: effectId, // ID is now validated
           project_id: projectId,
           kind: validated.kind,
           track: validated.track,
