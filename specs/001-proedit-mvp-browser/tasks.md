@@ -192,18 +192,18 @@
 
 ### Implementation for User Story 5
 
-- [ ] T070 [P] [US5] Create TextEditor panel using shadcn/ui Sheet in features/effects/components/TextEditor.tsx
-- [ ] T071 [P] [US5] Create font picker using shadcn/ui Select in features/effects/components/FontPicker.tsx
-- [ ] T072 [P] [US5] Create color picker using shadcn/ui Popover in features/effects/components/ColorPicker.tsx
-- [ ] T073 [US5] Port TextManager from omniclip in features/compositor/managers/TextManager.ts
-- [ ] T074 [US5] Implement PIXI.Text creation in features/compositor/utils/text.ts
-- [ ] T075 [P] [US5] Create text style controls panel in features/effects/components/TextStyleControls.tsx
-- [ ] T076 [US5] Implement text effect CRUD in app/actions/effects.ts (extend for text)
-- [ ] T077 [US5] Add text to timeline as special effect type
-- [ ] T078 [P] [US5] Create text animation presets in features/effects/presets/text.ts
-- [ ] T079 [US5] Connect text editor to canvas for real-time updates
+- [X] T070 [P] [US5] Create TextEditor panel using shadcn/ui Sheet in features/effects/components/TextEditor.tsx (✅ Completed)
+- [X] T071 [P] [US5] Create font picker using shadcn/ui Select in features/effects/components/FontPicker.tsx (✅ Completed)
+- [X] T072 [P] [US5] Create color picker using shadcn/ui Popover in features/effects/components/ColorPicker.tsx (✅ Completed)
+- [X] T073 [US5] Port TextManager from omniclip in features/compositor/managers/TextManager.ts (✅ 732 lines - 100% ported)
+- [ ] T074 [US5] Implement PIXI.Text creation in features/compositor/utils/text.ts (integrated into TextManager)
+- [X] T075 [P] [US5] Create text style controls panel in features/effects/components/TextStyleControls.tsx (✅ 3-tab interface completed)
+- [X] T076 [US5] Implement text effect CRUD in app/actions/effects.ts (✅ createTextEffect + updateTextEffectStyle + updateTextPosition)
+- [ ] T077 [US5] Add text to timeline as special effect type (requires EditorClient integration)
+- [ ] T078 [P] [US5] Create text animation presets in features/effects/presets/text.ts (deferred)
+- [ ] T079 [US5] Connect text editor to canvas for real-time updates (requires EditorClient integration)
 
-**Checkpoint**: Text overlays fully functional
+**Checkpoint**: Text overlays infrastructure complete - integration pending EditorClient work
 
 ---
 
@@ -245,16 +245,16 @@
 
 ### Implementation for User Story 7
 
-- [ ] T093 [US7] Implement auto-save debounce logic in features/timeline/utils/autosave.ts
-- [ ] T094 [US7] Create sync manager for Supabase Realtime in lib/supabase/sync.ts
-- [ ] T095 [P] [US7] Add save indicator UI in components/SaveIndicator.tsx
-- [ ] T096 [US7] Implement conflict detection for multi-tab editing
-- [ ] T097 [P] [US7] Create recovery modal using shadcn/ui AlertDialog
-- [ ] T098 [US7] Set up optimistic updates in Zustand stores
-- [ ] T099 [US7] Add offline support detection
-- [ ] T100 [P] [US7] Create session restoration on page load
+- [X] T093 [US7] Implement auto-save debounce logic in features/timeline/utils/autosave.ts (✅ 196 lines - debounce implemented)
+- [X] T094 [US7] Create sync manager for Supabase Realtime in lib/supabase/sync.ts (✅ 185 lines - realtime sync ready)
+- [X] T095 [P] [US7] Add save indicator UI in components/SaveIndicator.tsx (✅ 116 lines - 3 states: saving/saved/error)
+- [X] T096 [US7] Implement conflict detection for multi-tab editing (✅ included in ConflictResolutionDialog - 108 lines)
+- [X] T097 [P] [US7] Create recovery modal using shadcn/ui AlertDialog (✅ RecoveryModal.tsx - 69 lines)
+- [ ] T098 [US7] Set up optimistic updates in Zustand stores (requires store integration testing)
+- [ ] T099 [US7] Add offline support detection (network detection logic pending)
+- [ ] T100 [P] [US7] Create session restoration on page load (requires EditorClient integration)
 
-**Checkpoint**: Auto-save and recovery complete
+**Checkpoint**: Auto-save core infrastructure complete - integration pending
 
 ---
 
