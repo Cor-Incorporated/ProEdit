@@ -338,6 +338,7 @@ export class Compositor {
   /**
    * Destroy compositor
    * P0-FIX: Proper cleanup to prevent memory leaks
+   * CR-FIX: Enhanced cleanup with explicit resource disposal
    */
   destroy(): void {
     this.pause()
@@ -348,27 +349,38 @@ export class Compositor {
       this.animationFrameId = null
     }
 
-    // Clean up all managers (in correct order)
+    // CR-FIX: Remove all effects from stage explicitly before manager cleanup
+    this.currentlyPlayedEffects.forEach((effect) => {
+      if (isVideoEffect(effect)) {
+        this.videoManager.removeFromStage(effect.id)
+      } else if (isImageEffect(effect)) {
+        this.imageManager.removeFromStage(effect.id)
+      } else if (isTextEffect(effect)) {
+        this.textManager.remove_text_from_canvas(effect)
+      }
+    })
+
+    // Clear references
+    this.currentlyPlayedEffects.clear()
+
+    // CR-FIX: Destroy managers in correct order (media first, then text)
+    // This ensures all textures and sprites are released before PIXI cleanup
     this.videoManager.destroy()
     this.imageManager.destroy()
     this.audioManager.destroy()
     this.textManager.clear()
 
-    // Clear all effects
-    this.currentlyPlayedEffects.clear()
-
-    // Remove all children from stage before destroying
+    // CR-FIX: Clear all stage children before destroying app
     this.app.stage.removeChildren()
-    this.app.stage.destroy({ children: true, texture: true })
 
-    // Destroy PIXI application with full cleanup (PIXI v7 compatible)
-    // Note: textureSource doesn't exist in PIXI v7, only children and texture
+    // Destroy PIXI application with full cleanup
+    // PIXI v7: Use removeView to detach canvas, then destroy
     this.app.destroy(true, {
       children: true,
       texture: true,
     })
 
-    logger.info('Compositor: Cleaned up all resources')
+    logger.info('Compositor: Cleaned up all resources (enhanced memory leak prevention)')
   }
 
   /**

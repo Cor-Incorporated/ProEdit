@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { EffectBaseSchema } from "@/lib/validation/effect-schemas";
+import { EffectBaseSchema, validateEffectProperties } from "@/lib/validation/effect-schemas";
 import { Project, ProjectSettings } from "@/types/project";
 import { revalidatePath } from "next/cache";
 
@@ -230,16 +230,18 @@ export async function saveProject(
       }
 
       // Insert new effects
-      // Validate each effect before insertion (P0-FIX: Added ID validation to prevent SQL injection)
+      // Validate each effect before insertion
+      // P0-FIX: Added ID validation to prevent SQL injection
+      // CR-FIX: Added properties validation to prevent malicious data
       const effectsToInsert = projectData.effects.map((effect: unknown) => {
         const effectData = effect as Record<string, unknown>;
-        
+
         // Validate ID to prevent SQL injection
         const effectId = typeof effectData.id === 'string' ? effectData.id : '';
         if (!effectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(effectId)) {
           throw new Error(`Invalid effect ID format: ${effectId}`);
         }
-        
+
         const validated = EffectBaseSchema.parse({
           kind: effectData.kind,
           track: effectData.track,
@@ -249,6 +251,14 @@ export async function saveProject(
           end: effectData.end,
           media_file_id: effectData.media_file_id || null,
         });
+
+        // CR-FIX: Validate properties based on effect kind
+        // This prevents malicious data from being stored in the database
+        const validatedProperties = validateEffectProperties(
+          validated.kind,
+          effectData.properties || {}
+        );
+
         return {
           id: effectId, // ID is now validated
           project_id: projectId,
@@ -259,7 +269,7 @@ export async function saveProject(
           start: validated.start,  // Fixed: Use 'start' instead of 'start_time'
           end: validated.end,      // Fixed: Use 'end' instead of 'end_time'
           media_file_id: validated.media_file_id || null,
-          properties: effectData.properties || {},
+          properties: validatedProperties as Record<string, unknown>,
         };
       });
 
