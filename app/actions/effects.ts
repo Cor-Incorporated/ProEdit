@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { Effect } from '@/types/effects'
+import { Effect, VideoImageProperties, AudioProperties, TextProperties } from '@/types/effects'
 
 /**
  * Create a new effect on the timeline
@@ -41,7 +41,7 @@ export async function createEffect(
       start: effect.start, // Trim start (omniclip)
       end: effect.end, // Trim end (omniclip)
       media_file_id: effect.media_file_id || null,
-      properties: effect.properties as any,
+      properties: effect.properties as unknown as Record<string, unknown>,
       // Add metadata fields
       file_hash: 'file_hash' in effect ? effect.file_hash : null,
       name: 'name' in effect ? effect.name : null,
@@ -121,7 +121,7 @@ export async function updateEffect(
   if (!effect) throw new Error('Effect not found')
 
   // Type assertion to access nested fields
-  const effectWithProject = effect as any
+  const effectWithProject = effect as unknown as { project_id: string; projects: { user_id: string } }
   if (effectWithProject.projects.user_id !== user.id) {
     throw new Error('Unauthorized')
   }
@@ -131,7 +131,7 @@ export async function updateEffect(
     .from('effects')
     .update({
       ...updates,
-      properties: updates.properties as any,
+      properties: updates.properties as unknown as Record<string, unknown> | undefined,
     })
     .eq('id', effectId)
     .select()
@@ -167,7 +167,7 @@ export async function deleteEffect(effectId: string): Promise<void> {
   if (!effect) throw new Error('Effect not found')
 
   // Type assertion to access nested fields
-  const effectWithProject = effect as any
+  const effectWithProject = effect as unknown as { project_id: string; projects: { user_id: string } }
   if (effectWithProject.projects.user_id !== user.id) {
     throw new Error('Unauthorized')
   }
@@ -261,8 +261,8 @@ export async function createEffectFromMediaFile(
   if (!kind) throw new Error('Unsupported media type')
 
   // 4. Get metadata
-  const metadata = mediaFile.metadata as any
-  const rawDuration = (metadata.duration || 5) * 1000 // Default 5s for images
+  const metadata = mediaFile.metadata as Record<string, unknown>
+  const rawDuration = ((metadata.duration as number | undefined) || 5) * 1000 // Default 5s for images
 
   // 5. Calculate optimal position and track if not provided
   const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
@@ -276,7 +276,7 @@ export async function createEffectFromMediaFile(
   }
 
   // 6. Create effect with appropriate properties
-  const effectData: any = {
+  const effectData = {
     kind,
     track,
     start_at_position: position,
@@ -286,10 +286,10 @@ export async function createEffectFromMediaFile(
     media_file_id: mediaFileId,
     file_hash: mediaFile.file_hash,
     name: mediaFile.filename,
-    thumbnail: kind === 'video' ? (metadata.thumbnail || '') :
+    thumbnail: kind === 'video' ? ((metadata.thumbnail as string | undefined) || '') :
                kind === 'image' ? (mediaFile.storage_path || '') : '',
-    properties: createDefaultProperties(kind, metadata),
-  }
+    properties: createDefaultProperties(kind, metadata) as unknown as VideoImageProperties | AudioProperties | TextProperties,
+  } as Omit<Effect, 'id' | 'project_id' | 'created_at' | 'updated_at'>
 
   // 7. Create effect in database
   return createEffect(projectId, effectData)
@@ -298,10 +298,10 @@ export async function createEffectFromMediaFile(
 /**
  * Create default properties based on media type
  */
-function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: any): any {
+function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: Record<string, unknown>): Record<string, unknown> {
   if (kind === 'video' || kind === 'image') {
-    const width = metadata.width || 1920
-    const height = metadata.height || 1080
+    const width = (metadata.width as number | undefined) || 1920
+    const height = (metadata.height as number | undefined) || 1080
 
     return {
       rect: {
@@ -319,14 +319,14 @@ function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: an
           y: height / 2
         }
       },
-      raw_duration: (metadata.duration || 5) * 1000,
-      frames: metadata.frames || Math.floor((metadata.duration || 5) * (metadata.fps || 30))
+      raw_duration: ((metadata.duration as number | undefined) || 5) * 1000,
+      frames: (metadata.frames as number | undefined) || Math.floor(((metadata.duration as number | undefined) || 5) * ((metadata.fps as number | undefined) || 30))
     }
   } else if (kind === 'audio') {
     return {
       volume: 1.0,
       muted: false,
-      raw_duration: metadata.duration * 1000
+      raw_duration: ((metadata.duration as number | undefined) || 0) * 1000
     }
   }
 

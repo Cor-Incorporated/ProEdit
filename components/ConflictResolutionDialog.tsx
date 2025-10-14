@@ -83,7 +83,7 @@ export function ConflictResolutionDialog({
             </div>
 
             <p className="text-xs text-amber-500">
-              Warning: The version you don't choose will be lost.
+              Warning: The version you don&apos;t choose will be lost.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>

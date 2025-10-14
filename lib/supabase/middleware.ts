@@ -32,9 +32,7 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
 
   // Protected routes logic can be added here
   // if (!user && !request.nextUrl.pathname.startsWith('/login')) {

@@ -17,7 +17,7 @@ import { getSignedUrl } from '@/app/actions/media'
 import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
 import { ExportController } from '@/features/export/utils/ExportController'
 import { ExportQuality } from '@/features/export/types'
-import { getMediaFileByHash } from '@/features/export/utils/getMediaFile'
+import { getMediaFileByHash } from '@/app/actions/media'
 import { downloadFile } from '@/features/export/utils/download'
 import { toast } from 'sonner'
 import * as PIXI from 'pixi.js'
@@ -49,7 +49,6 @@ export function EditorClient({ project }: EditorClientProps) {
   useKeyboardShortcuts()
 
   const {
-    isPlaying,
     timecode,
     setTimecode,
     setFps,
