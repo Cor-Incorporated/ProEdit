@@ -180,9 +180,16 @@ export class VideoManager {
 
   /**
    * Cleanup all videos
+   * FIXED: Added error handling to prevent cleanup failures
    */
   destroy(): void {
-    this.videos.forEach((_, id) => this.remove(id))
+    this.videos.forEach((_, id) => {
+      try {
+        this.remove(id)
+      } catch (error) {
+        console.warn(`VideoManager: Error removing video ${id}:`, error)
+      }
+    })
     this.videos.clear()
   }
 

@@ -73,8 +73,17 @@ export class ImageManager {
     this.images.delete(effectId)
   }
 
+  /**
+   * FIXED: Added error handling to prevent cleanup failures
+   */
   destroy(): void {
-    this.images.forEach((_, id) => this.remove(id))
+    this.images.forEach((_, id) => {
+      try {
+        this.remove(id)
+      } catch (error) {
+        console.warn(`ImageManager: Error removing image ${id}:`, error)
+      }
+    })
     this.images.clear()
   }
 

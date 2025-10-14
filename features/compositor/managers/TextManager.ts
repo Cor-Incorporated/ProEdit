@@ -677,14 +677,25 @@ export class TextManager extends Map<
   /**
    * Cleanup
    * Port from omniclip Line 550-554
+   * FIXED: Added try-catch to prevent cancelResize errors in PIXI v7
    */
   destroy(): void {
     if (this.#setPermissionStatus && this.#permissionStatus) {
       this.#permissionStatus.removeEventListener('change', this.#setPermissionStatus)
     }
-    // Clean up all sprites
+    // Clean up all sprites with error handling
     this.forEach((item) => {
-      item.sprite.destroy()
+      try {
+        // Remove from stage first to prevent rendering issues
+        if (item.sprite.parent) {
+          item.sprite.parent.removeChild(item.sprite)
+        }
+        item.sprite.destroy({ children: true, texture: true })
+      } catch (error) {
+        // PIXI v7 may throw cancelResize errors during destroy
+        // This is safe to ignore as we're cleaning up anyway
+        console.warn('TextManager: Sprite destroy error (safe to ignore):', error)
+      }
     })
     this.clear()
   }
