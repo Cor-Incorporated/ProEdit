@@ -374,13 +374,17 @@ export class Compositor {
     this.app.stage.removeChildren()
 
     // Destroy PIXI application with full cleanup
-    // PIXI v7: Use removeView to detach canvas, then destroy
-    this.app.destroy(true, {
-      children: true,
-      texture: true,
-    })
-
-    logger.info('Compositor: Cleaned up all resources (enhanced memory leak prevention)')
+    // PIXI v7: app.destroy() automatically handles stage cleanup
+    // DO NOT call stage.destroy() separately - it causes cancelResize errors
+    try {
+      this.app.destroy(true, {
+        children: true,
+        texture: true,
+      })
+      logger.info('Compositor: Cleaned up all resources (enhanced memory leak prevention)')
+    } catch (error) {
+      logger.error('Compositor: Error during cleanup', error)
+    }
   }
 
   /**

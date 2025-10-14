@@ -38,7 +38,8 @@ export function Canvas({ width, height, onAppReady }: CanvasProps) {
 
       // Configure stage (from omniclip:49-50)
       app.stage.sortableChildren = true
-      app.stage.interactive = true
+      // PIXI v7.2+: Use eventMode instead of deprecated interactive property
+      app.stage.eventMode = 'static'
       app.stage.hitArea = app.screen
 
       // Store app reference
