@@ -47,3 +47,6 @@ next-env.d.ts
 # IDE
 .vscode/
 .idea/
+
+# Supabase
+supabase/.temp/

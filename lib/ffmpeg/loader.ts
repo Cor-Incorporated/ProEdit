@@ -53,9 +53,7 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
     // Set up progress tracking
     ffmpeg.on("progress", ({ progress, time }) => {
       if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[FFmpeg Progress] ${(progress * 100).toFixed(2)}% (${time}ms)`
-        );
+        console.log(`[FFmpeg Progress] ${(progress * 100).toFixed(2)}% (${time}ms)`);
       }
     });
 
@@ -64,10 +62,7 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
 
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(
-        `${baseURL}/ffmpeg-core.wasm`,
-        "application/wasm"
-      ),
+      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
     });
 
     ffmpegInstance = ffmpeg;
@@ -77,9 +72,7 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
   } catch (error) {
     isLoading = false;
     loadError = error as Error;
-    throw new Error(
-      `Failed to load FFmpeg: ${(error as Error).message}`
-    );
+    throw new Error(`Failed to load FFmpeg: ${(error as Error).message}`);
   }
 }
 

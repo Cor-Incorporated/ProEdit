@@ -163,8 +163,6 @@ export function isTextEffect(effect: Effect): effect is TextEffect {
   return effect.kind === "text";
 }
 
-export function hasMediaFile(
-  effect: Effect
-): effect is VideoEffect | ImageEffect | AudioEffect {
+export function hasMediaFile(effect: Effect): effect is VideoEffect | ImageEffect | AudioEffect {
   return effect.kind === "video" || effect.kind === "image" || effect.kind === "audio";
 }

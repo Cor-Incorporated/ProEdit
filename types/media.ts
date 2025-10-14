@@ -80,12 +80,7 @@ export const SUPPORTED_VIDEO_TYPES = [
   "video/x-matroska",
 ];
 
-export const SUPPORTED_AUDIO_TYPES = [
-  "audio/mpeg",
-  "audio/wav",
-  "audio/ogg",
-  "audio/webm",
-];
+export const SUPPORTED_AUDIO_TYPES = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"];
 
 export const SUPPORTED_IMAGE_TYPES = [
   "image/jpeg",

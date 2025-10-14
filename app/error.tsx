@@ -32,9 +32,7 @@ export default function Error({
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Something went wrong</CardTitle>
-          <CardDescription>
-            An unexpected error occurred. Please try again.
-          </CardDescription>
+          <CardDescription>An unexpected error occurred. Please try again.</CardDescription>
         </CardHeader>
         <CardContent>
           {process.env.NODE_ENV === "development" && (
@@ -43,11 +41,7 @@ export default function Error({
               <p className="text-muted-foreground break-words">
                 {error.message || "Unknown error"}
               </p>
-              {error.digest && (
-                <p className="text-muted-foreground mt-2">
-                  Digest: {error.digest}
-                </p>
-              )}
+              {error.digest && <p className="text-muted-foreground mt-2">Digest: {error.digest}</p>}
             </div>
           )}
         </CardContent>

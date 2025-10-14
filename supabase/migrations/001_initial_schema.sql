@@ -1,9 +1,6 @@
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Projects table
 CREATE TABLE projects (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL CHECK (char_length(name) BETWEEN 1 AND 255),
   settings JSONB NOT NULL DEFAULT '{"width": 1920, "height": 1080, "fps": 30, "aspectRatio": "16:9", "bitrate": 9000, "standard": "1080p"}'::jsonb,
@@ -13,7 +10,7 @@ CREATE TABLE projects (
 
 -- Media files table
 CREATE TABLE media_files (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   file_hash TEXT NOT NULL,
   filename TEXT NOT NULL,
@@ -27,7 +24,7 @@ CREATE TABLE media_files (
 
 -- Tracks table
 CREATE TABLE tracks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   track_index INTEGER NOT NULL CHECK (track_index >= 0),
   visible BOOLEAN NOT NULL DEFAULT true,
@@ -39,7 +36,7 @@ CREATE TABLE tracks (
 
 -- Effects table (polymorphic)
 CREATE TABLE effects (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK (kind IN ('video', 'audio', 'image', 'text')),
   track INTEGER NOT NULL CHECK (track >= 0),
@@ -55,7 +52,7 @@ CREATE TABLE effects (
 
 -- Filters table
 CREATE TABLE filters (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   effect_id UUID NOT NULL REFERENCES effects(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('brightness', 'contrast', 'saturation', 'blur', 'hue')),
@@ -65,7 +62,7 @@ CREATE TABLE filters (
 
 -- Animations table
 CREATE TABLE animations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   effect_id UUID NOT NULL REFERENCES effects(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('in', 'out')),
@@ -77,7 +74,7 @@ CREATE TABLE animations (
 
 -- Transitions table
 CREATE TABLE transitions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   from_effect_id UUID REFERENCES effects(id) ON DELETE CASCADE,
   to_effect_id UUID REFERENCES effects(id) ON DELETE CASCADE,
@@ -89,7 +86,7 @@ CREATE TABLE transitions (
 
 -- Export jobs table
 CREATE TABLE export_jobs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
   settings JSONB NOT NULL DEFAULT '{}'::jsonb,

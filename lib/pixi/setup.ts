@@ -19,9 +19,7 @@ export interface PIXISetupOptions {
  * @param options Configuration options for PIXI setup
  * @returns Promise<Application> The initialized PIXI app
  */
-export async function createPIXIApp(
-  options: PIXISetupOptions
-): Promise<Application> {
+export async function createPIXIApp(options: PIXISetupOptions): Promise<Application> {
   const {
     canvas,
     width,
@@ -44,11 +42,6 @@ export async function createPIXIApp(
     autoDensity: true,
     powerPreference: "high-performance",
     eventMode: "static",
-  });
-
-  // Enable renderer plugins
-  app.renderer.on("prerender", () => {
-    // Pre-render setup can go here
   });
 
   return app;
