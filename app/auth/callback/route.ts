@@ -17,5 +17,5 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to dashboard after successful authentication
-  return NextResponse.redirect(`${origin}/`);
+  return NextResponse.redirect(`${origin}/editor`);
 }

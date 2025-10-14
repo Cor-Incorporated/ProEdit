@@ -74,7 +74,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <>
       <Card
         className="cursor-pointer hover:bg-accent/50 transition-colors"
-        onClick={() => router.push(`/${project.id}`)}
+        onClick={() => router.push(`/editor/${project.id}`)}
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">

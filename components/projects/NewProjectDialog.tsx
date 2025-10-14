@@ -41,7 +41,7 @@ export function NewProjectDialog() {
 
       setOpen(false);
       setName("");
-      router.push(`/${project.id}`);
+      router.push(`/editor/${project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {

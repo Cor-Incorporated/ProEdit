@@ -4,7 +4,7 @@ import { getProjects } from "@/app/actions/projects";
 import { NewProjectDialog } from "@/components/projects/NewProjectDialog";
 import { ProjectCard } from "@/components/projects/ProjectCard";
 
-export default async function DashboardPage() {
+export default async function EditorDashboardPage() {
   const user = await getUser();
 
   if (!user) {

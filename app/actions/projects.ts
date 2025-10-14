@@ -102,7 +102,7 @@ export async function createProject(name: string): Promise<Project> {
     throw new Error(error.message);
   }
 
-  revalidatePath("/");
+  revalidatePath("/editor");
   return data as Project;
 }
 
@@ -144,7 +144,7 @@ export async function updateProject(
     throw new Error(error.message);
   }
 
-  revalidatePath("/");
+  revalidatePath("/editor");
   revalidatePath(`/editor/${projectId}`);
   return data as Project;
 }
@@ -171,5 +171,5 @@ export async function deleteProject(projectId: string): Promise<void> {
     throw new Error(error.message);
   }
 
-  revalidatePath("/");
+  revalidatePath("/editor");
 }

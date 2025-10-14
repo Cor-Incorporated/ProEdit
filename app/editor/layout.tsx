@@ -25,13 +25,13 @@ export default async function EditorLayout({ children }: { children: ReactNode }
       {/* Editor toolbar */}
       <header className="editor-toolbar h-14 px-4 flex items-center justify-between border-b border-border">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-lg font-semibold hover:text-primary transition-colors">
+          <Link href="/editor" className="text-lg font-semibold hover:text-primary transition-colors">
             ProEdit
           </Link>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/">
+            <Link href="/editor">
               <Home className="h-5 w-5" />
             </Link>
           </Button>
