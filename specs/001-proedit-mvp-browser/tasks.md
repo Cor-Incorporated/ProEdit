@@ -81,17 +81,17 @@
 
 ### Implementation for User Story 1
 
-- [ ] T022 [P] [US1] Create login page with Google OAuth button in app/(auth)/login/page.tsx using shadcn/ui Button
-- [ ] T023 [P] [US1] Implement auth callback handler in app/(auth)/callback/page.tsx
-- [ ] T024 [P] [US1] Create auth Server Actions in app/actions/auth.ts (signIn, signOut, getSession)
-- [ ] T025 [US1] Create dashboard page in app/(editor)/page.tsx with project list using shadcn/ui Card components
-- [ ] T026 [US1] Implement project Server Actions in app/actions/projects.ts (create, list, update, delete)
-- [ ] T027 [P] [US1] Create NewProjectDialog component using shadcn/ui Dialog in components/projects/NewProjectDialog.tsx
-- [ ] T028 [P] [US1] Create ProjectCard component using shadcn/ui Card in components/projects/ProjectCard.tsx
-- [ ] T029 [US1] Set up project store slice in stores/project.ts with Zustand
-- [ ] T030 [US1] Create empty timeline view in app/(editor)/[projectId]/page.tsx
-- [ ] T031 [P] [US1] Add loading skeleton using shadcn/ui Skeleton for project list
-- [ ] T032 [P] [US1] Implement error handling with toast notifications using shadcn/ui Toast
+- [X] T022 [P] [US1] Create login page with Google OAuth button in app/(auth)/login/page.tsx using shadcn/ui Button
+- [X] T023 [P] [US1] Implement auth callback handler in app/auth/callback/route.ts
+- [X] T024 [P] [US1] Create auth Server Actions in app/actions/auth.ts (signOut, getUser)
+- [X] T025 [US1] Create dashboard page in app/(editor)/page.tsx with project list using shadcn/ui Card components
+- [X] T026 [US1] Implement project Server Actions in app/actions/projects.ts (create, list, update, delete, get)
+- [X] T027 [P] [US1] Create NewProjectDialog component using shadcn/ui Dialog in components/projects/NewProjectDialog.tsx
+- [X] T028 [P] [US1] Create ProjectCard component using shadcn/ui Card in components/projects/ProjectCard.tsx
+- [X] T029 [US1] Set up project store slice in stores/project.ts with Zustand
+- [X] T030 [US1] Create empty timeline view in app/(editor)/[projectId]/page.tsx
+- [X] T031 [P] [US1] Add loading skeleton using shadcn/ui Skeleton for editor layout in app/(editor)/loading.tsx
+- [X] T032 [P] [US1] Implement error handling with toast notifications using shadcn/ui Sonner
 
 **Checkpoint**: Users can sign in and create projects - MVP foundation complete
 
