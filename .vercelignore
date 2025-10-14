@@ -1,0 +1,27 @@
+# Vercel deployment ignore file
+
+# Vendor dependencies (omniclip reference - not needed for deployment)
+vendor/
+
+# Archive files
+.archive/
+
+# Development and test files
+*.tmp
+*.temp
+.scratch/
+tests/
+vitest.config.ts
+
+# Documentation files (reduce bundle size)
+docs/
+specs/
+DEVELOPMENT_STATUS.md
+REMAINING_TASKS_ACTION_PLAN.md
+URGENT_ACTION_REQUIRED.md
+CLEANUP_SUMMARY.md
+COMPREHENSIVE_VERIFICATION_REPORT_2025-10-15.md
+
+# Large unnecessary files
+*.md.backup
+*.log

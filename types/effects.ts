@@ -27,10 +27,19 @@ export interface BaseEffect {
   project_id: string;
   kind: EffectKind;
   track: number;
+
+  // Timeline positioning (from omniclip)
   start_at_position: number; // Timeline position in ms
-  duration: number; // Display duration in ms
-  start_time: number; // Trim start in ms
-  end_time: number; // Trim end in ms
+  duration: number; // Display duration in ms (calculated: end - start)
+
+  // Trim points (from omniclip) - CRITICAL for Phase 6 trim functionality
+  start: number; // Trim start position in ms (within media file)
+  end: number; // Trim end position in ms (within media file)
+
+  // Mute state (from omniclip) - for audio mixing
+  is_muted?: boolean;
+
+  // Database-specific fields
   media_file_id?: string;
   created_at: string;
   updated_at: string;
@@ -47,12 +56,18 @@ export interface VideoEffect extends BaseEffect {
   kind: "video";
   properties: VideoImageProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
+  thumbnail: string; // Thumbnail URL (from omniclip)
 }
 
 export interface ImageEffect extends BaseEffect {
   kind: "image";
   properties: VideoImageProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
+  thumbnail?: string; // Optional thumbnail URL (omniclip compatible - images use source as thumbnail)
 }
 
 // Audio specific properties
@@ -66,29 +81,42 @@ export interface AudioEffect extends BaseEffect {
   kind: "audio";
   properties: AudioProperties;
   media_file_id: string;
+  file_hash: string; // File deduplication (from omniclip)
+  name: string; // Original filename (from omniclip)
 }
 
-// Text specific properties
+// Text specific properties - Complete omniclip compatibility
 export interface TextProperties {
   text: string;
   fontFamily: string;
   fontSize: number;
-  fontStyle: "normal" | "italic" | "bold" | "bold italic";
-  align: "left" | "center" | "right";
+  fontStyle: "normal" | "italic" | "oblique";
+  fontVariant: "normal" | "small-caps";
+  fontWeight: "normal" | "bold" | "bolder" | "lighter" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
+  align: "left" | "center" | "right" | "justify";
   fill: string[]; // Gradient colors
-  rect: {
-    width: number;
-    height: number;
-    position_on_canvas: Position;
-  };
-  stroke?: string;
-  strokeThickness?: number;
-  dropShadow?: boolean;
-  dropShadowDistance?: number;
-  dropShadowBlur?: number;
-  dropShadowAlpha?: number;
-  dropShadowAngle?: number;
-  dropShadowColor?: string;
+  fillGradientType: 0 | 1; // 0: VERTICAL, 1: HORIZONTAL
+  fillGradientStops: number[];
+  rect: Rect; // Full rect with all transform properties
+  stroke: string;
+  strokeThickness: number;
+  lineJoin: "miter" | "round" | "bevel";
+  miterLimit: number;
+  textBaseline: "alphabetic" | "top" | "hanging" | "middle" | "ideographic" | "bottom";
+  letterSpacing: number;
+  dropShadow: boolean;
+  dropShadowDistance: number;
+  dropShadowBlur: number;
+  dropShadowAlpha: number;
+  dropShadowAngle: number;
+  dropShadowColor: string;
+  // Advanced text properties from omniclip
+  breakWords: boolean;
+  wordWrap: boolean;
+  lineHeight: number;
+  leading: number;
+  wordWrapWidth: number;
+  whiteSpace: "pre" | "normal" | "pre-line";
 }
 
 export interface TextEffect extends BaseEffect {
