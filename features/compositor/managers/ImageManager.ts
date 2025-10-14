@@ -1,5 +1,5 @@
-import * as PIXI from 'pixi.js'
 import { ImageEffect } from '@/types/effects'
+import * as PIXI from 'pixi.js'
 
 /**
  * ImageManager - Manages image effects on PIXI canvas

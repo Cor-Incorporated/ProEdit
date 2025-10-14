@@ -183,11 +183,29 @@ export function EditorClient({ project }: EditorClientProps) {
   }
 
   // Sync effects with compositor when they change
+  // FIXED: Split into two effects to prevent infinite re-render loop (React Error #185)
+  const effectsRef = useRef(effects)
+  const prevEffectsLength = useRef(effects.length)
+
+  // Update ref when effects change
   useEffect(() => {
-    if (compositorRef.current && effects.length > 0) {
+    effectsRef.current = effects
+  }, [effects])
+
+  // Recompose when effects list changes (add/remove)
+  useEffect(() => {
+    if (compositorRef.current && effects.length !== prevEffectsLength.current) {
+      prevEffectsLength.current = effects.length
       compositorRef.current.composeEffects(effects, timecode)
     }
   }, [effects, timecode])
+
+  // Recompose when timecode changes (but NOT when effects change)
+  useEffect(() => {
+    if (compositorRef.current && effectsRef.current.length > 0) {
+      compositorRef.current.composeEffects(effectsRef.current, timecode)
+    }
+  }, [timecode])
 
   // Handle export with progress callback
   const handleExport = async (

@@ -677,24 +677,29 @@ export class TextManager extends Map<
   /**
    * Cleanup
    * Port from omniclip Line 550-554
-   * FIXED: Added try-catch to prevent cancelResize errors in PIXI v7
+   * FIXED: Safe cleanup without calling sprite.destroy() to prevent cancelResize errors
+   * PIXI v7 has a known issue where resize observer cleanup fails in production builds
    */
   destroy(): void {
     if (this.#setPermissionStatus && this.#permissionStatus) {
       this.#permissionStatus.removeEventListener('change', this.#setPermissionStatus)
     }
-    // Clean up all sprites with error handling
+    
+    // FIXED: Safe cleanup without sprite.destroy()
+    // PIXI v7 resize observer cleanup is unreliable in production
     this.forEach((item) => {
       try {
-        // Remove from stage first to prevent rendering issues
+        // Remove from stage first
         if (item.sprite.parent) {
           item.sprite.parent.removeChild(item.sprite)
         }
-        item.sprite.destroy({ children: true, texture: true })
+        // Remove event listeners
+        item.sprite.removeAllListeners()
+        // Clear text content to free memory
+        item.sprite.text = ''
+        // DO NOT call item.sprite.destroy() - causes cancelResize error in production
       } catch (error) {
-        // PIXI v7 may throw cancelResize errors during destroy
-        // This is safe to ignore as we're cleaning up anyway
-        console.warn('TextManager: Sprite destroy error (safe to ignore):', error)
+        console.warn('TextManager: Sprite cleanup error:', error)
       }
     })
     this.clear()
