@@ -38,10 +38,14 @@ export async function createEffect(
       track: effect.track,
       start_at_position: effect.start_at_position,
       duration: effect.duration,
-      start_time: effect.start_time,
-      end_time: effect.end_time,
+      start: effect.start, // Trim start (omniclip)
+      end: effect.end, // Trim end (omniclip)
       media_file_id: effect.media_file_id || null,
       properties: effect.properties as any,
+      // Add metadata fields
+      file_hash: 'file_hash' in effect ? effect.file_hash : null,
+      name: 'name' in effect ? effect.name : null,
+      thumbnail: 'thumbnail' in effect ? effect.thumbnail : null,
     })
     .select()
     .single()
@@ -211,4 +215,120 @@ export async function batchUpdateEffects(
   }
 
   return updatedEffects
+}
+
+/**
+ * Create effect from media file with automatic positioning and smart defaults
+ * This is the main entry point from UI (MediaCard "Add to Timeline" button)
+ *
+ * @param projectId Project ID
+ * @param mediaFileId Media file ID
+ * @param targetPosition Optional target position (auto-calculated if not provided)
+ * @param targetTrack Optional target track (auto-calculated if not provided)
+ * @returns Promise<Effect> Created effect with proper defaults
+ */
+export async function createEffectFromMediaFile(
+  projectId: string,
+  mediaFileId: string,
+  targetPosition?: number,
+  targetTrack?: number
+): Promise<Effect> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Get media file
+  const { data: mediaFile, error: mediaError } = await supabase
+    .from('media_files')
+    .select('*')
+    .eq('id', mediaFileId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (mediaError || !mediaFile) {
+    throw new Error('Media file not found')
+  }
+
+  // 2. Get existing effects for smart placement
+  const existingEffects = await getEffects(projectId)
+
+  // 3. Determine effect kind from MIME type
+  const kind = mediaFile.mime_type.startsWith('video/') ? 'video' as const :
+               mediaFile.mime_type.startsWith('audio/') ? 'audio' as const :
+               mediaFile.mime_type.startsWith('image/') ? 'image' as const :
+               null
+
+  if (!kind) throw new Error('Unsupported media type')
+
+  // 4. Get metadata
+  const metadata = mediaFile.metadata as any
+  const rawDuration = (metadata.duration || 5) * 1000 // Default 5s for images
+
+  // 5. Calculate optimal position and track if not provided
+  const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
+  let position = targetPosition ?? 0
+  let track = targetTrack ?? 0
+
+  if (targetPosition === undefined || targetTrack === undefined) {
+    const optimal = findPlaceForNewEffect(existingEffects, 3) // 3 tracks default
+    position = targetPosition ?? optimal.position
+    track = targetTrack ?? optimal.track
+  }
+
+  // 6. Create effect with appropriate properties
+  const effectData: any = {
+    kind,
+    track,
+    start_at_position: position,
+    duration: rawDuration,
+    start: 0, // Trim start (omniclip)
+    end: rawDuration, // Trim end (omniclip)
+    media_file_id: mediaFileId,
+    file_hash: mediaFile.file_hash,
+    name: mediaFile.filename,
+    thumbnail: kind === 'video' ? (metadata.thumbnail || '') :
+               kind === 'image' ? (mediaFile.storage_path || '') : '',
+    properties: createDefaultProperties(kind, metadata),
+  }
+
+  // 7. Create effect in database
+  return createEffect(projectId, effectData)
+}
+
+/**
+ * Create default properties based on media type
+ */
+function createDefaultProperties(kind: 'video' | 'audio' | 'image', metadata: any): any {
+  if (kind === 'video' || kind === 'image') {
+    const width = metadata.width || 1920
+    const height = metadata.height || 1080
+
+    return {
+      rect: {
+        width,
+        height,
+        scaleX: 1,
+        scaleY: 1,
+        position_on_canvas: {
+          x: 1920 / 2, // Center X
+          y: 1080 / 2  // Center Y
+        },
+        rotation: 0,
+        pivot: {
+          x: width / 2,
+          y: height / 2
+        }
+      },
+      raw_duration: (metadata.duration || 5) * 1000,
+      frames: metadata.frames || Math.floor((metadata.duration || 5) * (metadata.fps || 30))
+    }
+  } else if (kind === 'audio') {
+    return {
+      volume: 1.0,
+      muted: false,
+      raw_duration: metadata.duration * 1000
+    }
+  }
+
+  return {}
 }

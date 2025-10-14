@@ -2,20 +2,25 @@
 
 import { MediaFile, isVideoMetadata, isAudioMetadata, isImageMetadata } from '@/types/media'
 import { Card } from '@/components/ui/card'
-import { FileVideo, FileAudio, FileImage, Trash2 } from 'lucide-react'
+import { FileVideo, FileAudio, FileImage, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { deleteMedia } from '@/app/actions/media'
+import { createEffectFromMediaFile } from '@/app/actions/effects'
 import { useMediaStore } from '@/stores/media'
+import { useTimelineStore } from '@/stores/timeline'
 import { toast } from 'sonner'
 
 interface MediaCardProps {
   media: MediaFile
+  projectId: string
 }
 
-export function MediaCard({ media }: MediaCardProps) {
+export function MediaCard({ media, projectId }: MediaCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isAdding, setIsAdding] = useState(false)
   const { removeMediaFile, toggleMediaSelection, selectedMediaIds } = useMediaStore()
+  const { addEffect } = useTimelineStore()
   const isSelected = selectedMediaIds.includes(media.id)
 
   // Get icon based on media type
@@ -47,6 +52,33 @@ export function MediaCard({ media }: MediaCardProps) {
       return `${media.metadata.width}x${media.metadata.height}`
     }
     return null
+  }
+
+  // Handle add to timeline
+  const handleAddToTimeline = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    setIsAdding(true)
+    try {
+      // createEffectFromMediaFile automatically calculates optimal position and track
+      const effect = await createEffectFromMediaFile(
+        projectId,
+        media.id,
+        undefined, // Auto-calculate position
+        undefined  // Auto-calculate track
+      )
+
+      addEffect(effect)
+      toast.success('Added to timeline', {
+        description: media.filename
+      })
+    } catch (error) {
+      toast.error('Failed to add to timeline', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      })
+    } finally {
+      setIsAdding(false)
+    }
   }
 
   // Handle delete
@@ -120,7 +152,18 @@ export function MediaCard({ media }: MediaCardProps) {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end">
+        <div className="flex justify-between gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            className="flex-1"
+            onClick={handleAddToTimeline}
+            disabled={isAdding}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            {isAdding ? 'Adding...' : 'Add'}
+          </Button>
+
           <Button
             variant="ghost"
             size="icon"

@@ -27,10 +27,16 @@ export interface BaseEffect {
   project_id: string;
   kind: EffectKind;
   track: number;
+
+  // Timeline positioning (from omniclip)
   start_at_position: number; // Timeline position in ms
-  duration: number; // Display duration in ms
-  start_time: number; // Trim start in ms
-  end_time: number; // Trim end in ms
+  duration: number; // Display duration in ms (calculated: end - start)
+
+  // Trim points (from omniclip) - CRITICAL for Phase 6 trim functionality
+  start: number; // Trim start position in ms (within media file)
+  end: number; // Trim end position in ms (within media file)
+
+  // Database-specific fields
   media_file_id?: string;
   created_at: string;
   updated_at: string;
@@ -58,7 +64,7 @@ export interface ImageEffect extends BaseEffect {
   media_file_id: string;
   file_hash: string; // File deduplication (from omniclip)
   name: string; // Original filename (from omniclip)
-  thumbnail: string; // Thumbnail URL (from omniclip)
+  thumbnail?: string; // Optional thumbnail URL (omniclip compatible - images use source as thumbnail)
 }
 
 // Audio specific properties

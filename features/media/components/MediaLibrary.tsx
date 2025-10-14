@@ -62,7 +62,7 @@ export function MediaLibrary({ projectId, open, onOpenChange }: MediaLibraryProp
           ) : (
             <div className="media-browser">
               {mediaFiles.map(media => (
-                <MediaCard key={media.id} media={media} />
+                <MediaCard key={media.id} media={media} projectId={projectId} />
               ))}
             </div>
           )}

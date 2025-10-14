@@ -19,8 +19,8 @@ const createMockEffect = (
   track,
   start_at_position: startPosition,
   duration,
-  start_time: 0,
-  end_time: duration,
+  start: 0, // Trim start (omniclip)
+  end: duration, // Trim end (omniclip)
   media_file_id: 'test-media',
   file_hash: 'test-hash',
   name: 'test.mp4',
