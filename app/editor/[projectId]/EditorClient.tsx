@@ -196,9 +196,12 @@ export function EditorClient({ project }: EditorClientProps) {
   useEffect(() => {
     if (compositorRef.current && effects.length !== prevEffectsLength.current) {
       prevEffectsLength.current = effects.length
-      compositorRef.current.composeEffects(effects, timecode)
+      // Get current timecode from compositor instead of using state
+      // This prevents the dependency on timecode from causing re-runs
+      const currentTimecode = compositorRef.current.getTimecode()
+      compositorRef.current.composeEffects(effects, currentTimecode)
     }
-  }, [effects, timecode])
+  }, [effects])  // FIXED: Removed timecode from dependencies
 
   // Recompose when timecode changes (but NOT when effects change)
   useEffect(() => {

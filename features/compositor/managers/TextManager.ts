@@ -695,6 +695,15 @@ export class TextManager extends Map<
         }
         // Remove event listeners
         item.sprite.removeAllListeners()
+        // Explicitly destroy texture to prevent memory leaks
+        if (item.sprite.texture && item.sprite.texture !== PIXI.Texture.EMPTY) {
+          try {
+            item.sprite.texture.destroy(true)
+          } catch (err) {
+            // Texture destroy may fail, but that's acceptable
+            console.warn('TextManager: Texture destroy warning (safe to ignore):', err)
+          }
+        }
         // Clear text content to free memory
         item.sprite.text = ''
         // DO NOT call item.sprite.destroy() - causes cancelResize error in production
