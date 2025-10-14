@@ -12,6 +12,14 @@ export interface TimelineStore {
   trackCount: number
   selectedEffectIds: string[]
 
+  // Phase 6: Editing state
+  isDragging: boolean
+  draggedEffectId: string | null
+  isTrimming: boolean
+  trimmedEffectId: string | null
+  trimSide: 'start' | 'end' | null
+  snapEnabled: boolean
+
   // Actions
   setEffects: (effects: Effect[]) => void
   addEffect: (effect: Effect) => void
@@ -24,6 +32,12 @@ export interface TimelineStore {
   setTrackCount: (count: number) => void
   toggleEffectSelection: (id: string) => void
   clearSelection: () => void
+
+  // Phase 6: Editing actions
+  setDragging: (isDragging: boolean, effectId?: string) => void
+  setTrimming: (isTrimming: boolean, effectId?: string, side?: 'start' | 'end') => void
+  toggleSnap: () => void
+  restoreSnapshot: (effects: Effect[]) => void
 }
 
 export const useTimelineStore = create<TimelineStore>()(
@@ -37,6 +51,14 @@ export const useTimelineStore = create<TimelineStore>()(
       zoom: 100, // 100px = 1 second
       trackCount: 3,
       selectedEffectIds: [],
+
+      // Phase 6: Editing state
+      isDragging: false,
+      draggedEffectId: null,
+      isTrimming: false,
+      trimmedEffectId: null,
+      trimSide: null,
+      snapEnabled: true,
 
       // Actions
       setEffects: (effects) => set({ effects }),
@@ -73,6 +95,24 @@ export const useTimelineStore = create<TimelineStore>()(
       })),
 
       clearSelection: () => set({ selectedEffectIds: [] }),
+
+      // Phase 6: Editing actions
+      setDragging: (isDragging, effectId) => set({
+        isDragging,
+        draggedEffectId: isDragging ? effectId ?? null : null
+      }),
+
+      setTrimming: (isTrimming, effectId, side) => set({
+        isTrimming,
+        trimmedEffectId: isTrimming ? effectId ?? null : null,
+        trimSide: isTrimming ? side ?? null : null
+      }),
+
+      toggleSnap: () => set((state) => ({
+        snapEnabled: !state.snapEnabled
+      })),
+
+      restoreSnapshot: (effects) => set({ effects }),
     }),
     { name: 'timeline-store' }
   )

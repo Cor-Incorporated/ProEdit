@@ -3,6 +3,7 @@
 import { Effect, isVideoEffect, isAudioEffect, isImageEffect, isTextEffect } from '@/types/effects'
 import { useTimelineStore } from '@/stores/timeline'
 import { FileVideo, FileAudio, FileImage, Type } from 'lucide-react'
+import { TrimHandles } from './TrimHandles'
 
 interface EffectBlockProps {
   effect: Effect
@@ -73,6 +74,9 @@ export function EffectBlock({ effect }: EffectBlockProps) {
       <span className="text-white text-xs truncate">
         {getLabel()}
       </span>
+
+      {/* Phase 6: Trim handles */}
+      <TrimHandles effect={effect} isSelected={isSelected} />
     </div>
   )
 }

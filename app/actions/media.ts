@@ -190,3 +190,29 @@ export async function getMediaSignedUrl(
 
   return data.signedUrl
 }
+
+/**
+ * Get signed URL for media file by media file ID
+ * Used by compositor to access media files securely
+ * @param mediaFileId Media file ID
+ * @returns Promise<string> Signed URL
+ */
+export async function getSignedUrl(mediaFileId: string): Promise<string> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Get media file info
+  const { data: media } = await supabase
+    .from('media_files')
+    .select('storage_path')
+    .eq('id', mediaFileId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!media) throw new Error('Media not found')
+
+  // Get signed URL for the storage path
+  return getMediaSignedUrl(media.storage_path)
+}

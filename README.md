@@ -3,11 +3,29 @@
 > **ブラウザで動作するプロフェッショナル動画エディタ**  
 > Adobe Premiere Pro風のUI/UXと、omniclipの高品質ロジックを統合
 
-![Status](https://img.shields.io/badge/Status-Phase%204%20Complete-success)
-![Progress](https://img.shields.io/badge/Progress-41.8%25-blue)
+![Status](https://img.shields.io/badge/Status-Phase%206%20Complete-success)
+![Progress](https://img.shields.io/badge/Progress-62.7%25-blue)
+![Critical](https://img.shields.io/badge/NEXT-Phase%208%20Export-red)
 ![Tech](https://img.shields.io/badge/Next.js-15.5.5-black)
 ![Tech](https://img.shields.io/badge/PIXI.js-8.14.0-red)
 ![Tech](https://img.shields.io/badge/Supabase-Latest-green)
+
+---
+
+## 🚨 **緊急通知: Export機能の実装が最優先**
+
+**Phase 1-6は完璧に完了していますが、Export機能が欠落しています。**
+
+- ✅ 編集機能: 完璧に動作
+- ❌ **Export機能: 未実装** ← 致命的
+
+**現状**: 「動画編集アプリ」ではなく「動画プレビューアプリ」  
+**影響**: 編集結果を動画ファイルとして出力できない
+
+📋 **詳細**: [`NEXT_ACTION_CRITICAL.md`](./NEXT_ACTION_CRITICAL.md)（必読）  
+📋 **実装指示**: [`PHASE8_IMPLEMENTATION_DIRECTIVE.md`](./PHASE8_IMPLEMENTATION_DIRECTIVE.md)
+
+**⚠️ Phase 8完了前に他のPhaseに着手することは厳禁**
 
 ---
 
@@ -25,39 +43,84 @@ ProEditは、ブラウザ上で動作する高性能なビデオエディタMVP�
 
 ## 📊 開発進捗（2025-10-14時点）
 
-### **Phase 1: Setup - ✅ 100%完了**
-- Next.js 15.5.5 + TypeScript
+**全体進捗**: 69/110タスク（62.7%） - Phase 1-6完了
+
+### **Phase 1: Setup - ✅ 100%完了** (6/6タスク)
+- Next.js 15 + TypeScript
 - shadcn/ui 27コンポーネント
-- Tailwind CSS 4
+- Tailwind CSS
 - プロジェクト構造完成
 
-### **Phase 2: Foundation - ✅ 100%完了**
+### **Phase 2: Foundation - ✅ 100%完了** (15/15タスク)
 - Supabase（認証・DB・Storage）
 - Zustand状態管理
 - PIXI.js v8初期化
 - FFmpeg.wasm統合
 - 型定義完備（omniclip準拠）
 
-### **Phase 3: User Story 1 - ✅ 100%完了**
+### **Phase 3: User Story 1 - ✅ 100%完了** (11/11タスク)
 - Google OAuth認証
 - プロジェクト管理（CRUD）
 - ダッシュボードUI
 
-### **Phase 4: User Story 2 - ✅ 100%完了** 🎉
+### **Phase 4: User Story 2 - ✅ 100%完了** (14/14タスク)
 - メディアアップロード（ドラッグ&ドロップ）
 - ファイル重複排除（SHA-256ハッシュ）
 - タイムライン表示
 - Effect自動配置（omniclip準拠）
-- "Add to Timeline"機能
-- **データベースマイグレーション完了**
 
-### **Phase 5: User Story 3 - 🚧 実装中**
-- Real-time Preview and Playback
-- PIXI.js Compositor
-- 60fps再生
-- ビデオ/画像/オーディオ同期
+### **Phase 5: User Story 3 - ✅ 100%完了** (12/12タスク)
+- Real-time 60fps プレビュー
+- PIXI.js Canvas描画
+- Video/Image/Audio Manager（omniclip移植）
+- 再生制御（Play/Pause/Seek）
+- FPS監視
 
-**全体進捗**: **41.8%** (46/110タスク完了)
+### **Phase 6: User Story 4 - ✅ 100%完了** (11/11タスク)
+- Trim機能（左右エッジ）
+- Drag & Drop（時間軸+トラック）
+- Split機能（Sキー）
+- Snap-to-Grid
+- Undo/Redo（50操作履歴）
+- キーボードショートカット（13種類）
+
+### **Phase 7: User Story 5 - ❌ 未着手** (0/10タスク)
+- Text Overlay機能
+
+### **Phase 8: User Story 6 - 🚨 最優先** (0/13タスク)
+**⚠️ CRITICAL - Export機能が完全欠落**
+- FFmpegHelper実装
+- Encoder/Decoder実装
+- ExportController実装
+- Export UI実装
+- **影響**: 編集結果を出力できない
+
+📋 **実装指示**: [`PHASE8_IMPLEMENTATION_DIRECTIVE.md`](./PHASE8_IMPLEMENTATION_DIRECTIVE.md)
+
+### **Phase 9: User Story 7 - ⏸️ Phase 8完了後** (0/8タスク)
+- Auto-save機能
+
+### **Phase 10: Polish - ⏸️ Phase 9完了後** (0/10タスク)
+- UI/UX改善
+
+---
+
+## 📚 ドキュメント構造
+
+### **🔥 現在最重要** 
+- [`NEXT_ACTION_CRITICAL.md`](./NEXT_ACTION_CRITICAL.md) - **Phase 8 Export実装** 緊急指示
+- [`PHASE8_IMPLEMENTATION_DIRECTIVE.md`](./PHASE8_IMPLEMENTATION_DIRECTIVE.md) - Phase 8詳細実装ガイド
+
+### **📊 プロジェクト状況**
+- [`PHASE1-6_VERIFICATION_REPORT_DETAILED.md`](./PHASE1-6_VERIFICATION_REPORT_DETAILED.md) - Phase 1-6完了検証レポート
+
+### **🔧 開発ドキュメント**
+- [`docs/`](./docs/) - 開発ガイド・技術仕様
+- [`specs/001-proedit-mvp-browser/tasks.md`](./specs/001-proedit-mvp-browser/tasks.md) - 全タスク定義
+- [`features/*/README.md`](./features/) - 各機能の技術仕様
+
+### **⚙️ セットアップ**
+- [`supabase/SETUP_INSTRUCTIONS.md`](./supabase/SETUP_INSTRUCTIONS.md) - データベース設定
 
 ---
 

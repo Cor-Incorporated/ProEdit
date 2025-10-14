@@ -36,6 +36,9 @@ export interface BaseEffect {
   start: number; // Trim start position in ms (within media file)
   end: number; // Trim end position in ms (within media file)
 
+  // Mute state (from omniclip) - for audio mixing
+  is_muted?: boolean;
+
   // Database-specific fields
   media_file_id?: string;
   created_at: string;
