@@ -24,6 +24,9 @@ export class Compositor {
   private timecode = 0
   private animationFrameId: number | null = null
 
+  // FIXED: Store all effects for playback loop access
+  private allEffects: Effect[] = []
+
   // Currently visible effects
   private currentlyPlayedEffects = new Map<string, Effect>()
 
@@ -68,6 +71,16 @@ export class Compositor {
    */
   setOnFpsUpdate(callback: (fps: number) => void): void {
     this.onFpsUpdate = callback
+  }
+
+  /**
+   * Set effects for playback
+   * FIXED: Store effects internally so playback loop can access them
+   */
+  setEffects(effects: Effect[]): void {
+    this.allEffects = effects
+    // Immediately recompose with current timecode
+    void this.composeEffects(effects, this.timecode)
   }
 
   /**
@@ -155,6 +168,7 @@ export class Compositor {
   /**
    * Main playback loop
    * Ported from omniclip:87-98
+   * FIXED: Recompose effects every frame to update visibility based on timecode
    */
   private startPlaybackLoop = (): void => {
     if (!this.isPlaying) return
@@ -166,6 +180,12 @@ export class Compositor {
 
     // Update timecode
     this.timecode += elapsedTime
+
+    // FIXED: Update effects visibility based on new timecode
+    // This ensures effects appear/disappear at the correct times
+    if (this.allEffects.length > 0) {
+      void this.composeEffects(this.allEffects, this.timecode)
+    }
 
     // Notify timecode change
     if (this.onTimecodeChange) {

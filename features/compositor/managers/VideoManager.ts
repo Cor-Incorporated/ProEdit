@@ -1,5 +1,5 @@
-import * as PIXI from 'pixi.js'
 import { VideoEffect } from '@/types/effects'
+import * as PIXI from 'pixi.js'
 
 /**
  * VideoManager - Manages video effects on PIXI canvas

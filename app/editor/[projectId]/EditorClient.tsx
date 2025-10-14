@@ -182,22 +182,14 @@ export function EditorClient({ project }: EditorClientProps) {
   }
 
   // Sync effects with compositor when they change
-  // FIXED: Only recompose when effects change, not on every timecode update
-  // The playback loop handles timecode updates internally via callbacks
-  const timecodeRef = useRef(timecode)
-  
-  // Keep timecode ref in sync for when we need it
+  // FIXED: Let Compositor handle playback loop, React only updates on effects changes
   useEffect(() => {
-    timecodeRef.current = timecode
-  }, [timecode])
-  
-  // Recompose ONLY when effects change, using the current timecode
-  useEffect(() => {
-    if (!compositorRef.current || effects.length === 0) return
+    if (!compositorRef.current) return
     
-    // Use current timecode from state for consistency
-    compositorRef.current.composeEffects(effects, timecodeRef.current)
-  }, [effects])  // Only depend on effects, not timecode
+    // Store effects in Compositor so playback loop can access them
+    // This allows the loop to update effect visibility every frame
+    compositorRef.current.setEffects(effects)
+  }, [effects])
 
   // Handle export with progress callback
   const handleExport = async (
