@@ -91,17 +91,22 @@ export class Compositor {
    * FIXED: Performance optimization - only recompose when necessary
    */
   private async recomposeIfNeeded(): Promise<void> {
-    // Get effects visible at current timecode
-    const visibleEffects = this.getEffectsRelativeToTimecode(
-      this.allEffects,
-      this.timecode
-    )
-    const newIds = new Set(visibleEffects.map(e => e.id))
+    try {
+      // Get effects visible at current timecode
+      const visibleEffects = this.getEffectsRelativeToTimecode(
+        this.allEffects,
+        this.timecode
+      )
+      const newIds = new Set(visibleEffects.map(e => e.id))
 
-    // Only recompose if the set of visible effects changed
-    if (!this.setsEqual(this.visibleEffectIds, newIds)) {
-      await this.composeEffects(this.allEffects, this.timecode)
-      this.visibleEffectIds = newIds
+      // Only recompose if the set of visible effects changed
+      if (!this.setsEqual(this.visibleEffectIds, newIds)) {
+        await this.composeEffects(this.allEffects, this.timecode)
+        this.visibleEffectIds = newIds
+      }
+    } catch (error) {
+      logger.error('Compositor: Recompose failed:', error)
+      // Keep going - don't crash the playback loop
     }
   }
 
