@@ -362,10 +362,10 @@ export class Compositor {
     this.app.stage.destroy({ children: true, texture: true })
 
     // Destroy PIXI application with full cleanup (PIXI v7 compatible)
+    // Note: textureSource doesn't exist in PIXI v7, only children and texture
     this.app.destroy(true, {
       children: true,
       texture: true,
-      textureSource: true,
     })
 
     logger.info('Compositor: Cleaned up all resources')
