@@ -16,7 +16,7 @@ import type {
 } from 'pixi.js'
 import * as PIXI from 'pixi.js'
 
-// TEXT_GRADIENT enum values for PIXI v8
+// TEXT_GRADIENT enum values for PIXI v7
 type TEXT_GRADIENT = 0 | 1 // 0: VERTICAL, 1: HORIZONTAL
 
 // Font metadata for local font access API

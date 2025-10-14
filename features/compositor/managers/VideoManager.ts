@@ -40,7 +40,7 @@ export class VideoManager {
 
       // Create PIXI texture from video (omniclip:60-62)
       const texture = PIXI.Texture.from(element)
-      // Note: PIXI.js v8 doesn't have autoPlay property, handled by video element
+      // Note: PIXI.js v7 doesn't have autoPlay property, handled by video element
 
       // Create sprite (omniclip:63-73)
       const sprite = new PIXI.Sprite(texture)
