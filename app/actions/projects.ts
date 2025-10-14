@@ -1,9 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
-import { Project, ProjectSettings } from "@/types/project";
 import { EffectBaseSchema } from "@/lib/validation/effect-schemas";
+import { Project, ProjectSettings } from "@/types/project";
+import { revalidatePath } from "next/cache";
 
 export async function getProjects(): Promise<Project[]> {
   const supabase = await createClient();
@@ -231,18 +231,19 @@ export async function saveProject(
 
       // Insert new effects
       // Validate each effect before insertion
-      const effectsToInsert = projectData.effects.map((effect: any) => {
+      const effectsToInsert = projectData.effects.map((effect: unknown) => {
+        const effectData = effect as Record<string, unknown>;
         const validated = EffectBaseSchema.parse({
-          kind: effect.kind,
-          track: effect.track,
-          start_at_position: effect.start_at_position,
-          duration: effect.duration,
-          start: effect.start,
-          end: effect.end,
-          media_file_id: effect.media_file_id || null,
+          kind: effectData.kind,
+          track: effectData.track,
+          start_at_position: effectData.start_at_position,
+          duration: effectData.duration,
+          start: effectData.start,
+          end: effectData.end,
+          media_file_id: effectData.media_file_id || null,
         });
         return {
-          id: effect.id, // ID is not validated, it's preserved from the effect
+          id: effectData.id, // ID is not validated, it's preserved from the effect
           project_id: projectId,
           kind: validated.kind,
           track: validated.track,
@@ -251,7 +252,7 @@ export async function saveProject(
           start: validated.start,  // Fixed: Use 'start' instead of 'start_time'
           end: validated.end,      // Fixed: Use 'end' instead of 'end_time'
           media_file_id: validated.media_file_id || null,
-          properties: effect.properties || {},
+          properties: effectData.properties || {},
         };
       });
 
