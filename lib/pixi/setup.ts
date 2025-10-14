@@ -1,7 +1,7 @@
 import { Application, Assets } from "pixi.js";
 
 /**
- * PIXI.js v8 initialization helper
+ * PIXI.js v7 initialization helper
  * Sets up the PIXI Application with optimal settings for video editing
  */
 
@@ -29,11 +29,9 @@ export async function createPIXIApp(options: PIXISetupOptions): Promise<Applicat
     antialias = true,
   } = options;
 
-  // Initialize PIXI Application with WebGL renderer
-  const app = new Application();
-
-  await app.init({
-    canvas,
+  // Initialize PIXI Application with WebGL renderer (v7 API)
+  const app = new Application({
+    view: canvas,
     width,
     height,
     backgroundColor,
@@ -41,7 +39,6 @@ export async function createPIXIApp(options: PIXISetupOptions): Promise<Applicat
     antialias,
     autoDensity: true,
     powerPreference: "high-performance",
-    eventMode: "static",
   });
 
   return app;
@@ -72,7 +69,7 @@ export function destroyPIXIApp(app: Application): void {
     app.destroy(true, {
       children: true,
       texture: true,
-      textureSource: true,
+      baseTexture: true,
     });
   }
 }

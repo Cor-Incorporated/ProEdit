@@ -20,50 +20,46 @@ export function Canvas({ width, height, onAppReady }: CanvasProps) {
   useEffect(() => {
     if (!containerRef.current || appRef.current) return
 
-    // Initialize PIXI Application (from omniclip:37)
-    const app = new PIXI.Application()
-
-    app
-      .init({
+    // Initialize PIXI Application (from omniclip:37) - v7 API
+    try {
+      const app = new PIXI.Application({
         width,
         height,
         backgroundColor: 0x000000, // Black background
         antialias: true,
-        preference: 'webgl',
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       })
-      .then(() => {
-        if (!containerRef.current) return
 
-        // Append canvas to container
-        containerRef.current.appendChild(app.canvas)
+      if (!containerRef.current) return
 
-        // Configure stage (from omniclip:49-50)
-        app.stage.sortableChildren = true
-        app.stage.interactive = true
-        app.stage.hitArea = app.screen
+      // Append canvas to container (v7 uses app.view instead of app.canvas)
+      containerRef.current.appendChild(app.view as HTMLCanvasElement)
 
-        // Store app reference
-        appRef.current = app
-        setIsReady(true)
-        setCanvasReady(true)
+      // Configure stage (from omniclip:49-50)
+      app.stage.sortableChildren = true
+      app.stage.interactive = true
+      app.stage.hitArea = app.screen
 
-        // Notify parent
-        if (onAppReady) {
-          onAppReady(app)
-        }
+      // Store app reference
+      appRef.current = app
+      setIsReady(true)
+      setCanvasReady(true)
 
-        toast.success('Canvas initialized', {
-          description: `${width}x${height} @ 60fps`,
-        })
+      // Notify parent
+      if (onAppReady) {
+        onAppReady(app)
+      }
+
+      toast.success('Canvas initialized', {
+        description: `${width}x${height} @ 60fps`,
       })
-      .catch((error) => {
-        console.error('Failed to initialize PIXI:', error)
-        toast.error('Failed to initialize canvas', {
-          description: error.message,
-        })
+    } catch (error: any) {
+      console.error('Failed to initialize PIXI:', error)
+      toast.error('Failed to initialize canvas', {
+        description: error.message,
       })
+    }
 
     // Cleanup
     return () => {
