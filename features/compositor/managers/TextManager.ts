@@ -5,16 +5,16 @@
  * Constitutional FR-007 compliance - Text Overlay Creation
  */
 
-import * as PIXI from 'pixi.js'
 import { TextEffect } from '@/types/effects'
 import type {
-  TextStyleAlign,
-  TextStyleFontStyle,
-  TextStyleFontVariant,
-  TextStyleFontWeight,
-  TextStyleTextBaseline,
-  TextStyleWhiteSpace,
+    TextStyleAlign,
+    TextStyleFontStyle,
+    TextStyleFontVariant,
+    TextStyleFontWeight,
+    TextStyleTextBaseline,
+    TextStyleWhiteSpace,
 } from 'pixi.js'
+import * as PIXI from 'pixi.js'
 
 // TEXT_GRADIENT enum values for PIXI v8
 type TEXT_GRADIENT = 0 | 1 // 0: VERTICAL, 1: HORIZONTAL
