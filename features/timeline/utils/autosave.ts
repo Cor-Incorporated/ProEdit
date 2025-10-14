@@ -5,9 +5,9 @@
  */
 
 import { saveProject } from "@/app/actions/projects";
-import { useTimelineStore } from "@/stores/timeline";
-import { useMediaStore } from "@/stores/media";
 import { logger } from "@/lib/utils/logger";
+import { useMediaStore } from "@/stores/media";
+import { useTimelineStore } from "@/stores/timeline";
 
 export class AutoSaveManager {
   private debounceTimer: NodeJS.Timeout | null = null;

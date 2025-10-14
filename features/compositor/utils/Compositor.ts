@@ -1,10 +1,10 @@
-import * as PIXI from 'pixi.js'
-import { Effect, isVideoEffect, isImageEffect, isAudioEffect, isTextEffect, TextEffect } from '@/types/effects'
-import { VideoManager } from '../managers/VideoManager'
-import { ImageManager } from '../managers/ImageManager'
-import { AudioManager } from '../managers/AudioManager'
-import { TextManager } from '../managers/TextManager'
 import { logger } from '@/lib/utils/logger'
+import { Effect, isAudioEffect, isImageEffect, isTextEffect, isVideoEffect, TextEffect } from '@/types/effects'
+import * as PIXI from 'pixi.js'
+import { AudioManager } from '../managers/AudioManager'
+import { ImageManager } from '../managers/ImageManager'
+import { TextManager } from '../managers/TextManager'
+import { VideoManager } from '../managers/VideoManager'
 
 /**
  * Compositor - Main compositing engine

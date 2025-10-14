@@ -1,10 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { AudioProperties, Effect, TextProperties, VideoImageProperties } from '@/types/effects'
 import { revalidatePath } from 'next/cache'
-import { Effect, VideoImageProperties, AudioProperties, TextProperties } from '@/types/effects'
 // P0-3 FIX: Add input validation
-import { validateEffectProperties, validatePartialEffectProperties, EffectBaseSchema } from '@/lib/validation/effect-schemas'
+import { EffectBaseSchema, validateEffectProperties, validatePartialEffectProperties } from '@/lib/validation/effect-schemas'
 
 /**
  * Create a new effect on the timeline
