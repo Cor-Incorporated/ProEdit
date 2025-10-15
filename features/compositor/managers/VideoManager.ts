@@ -1,6 +1,6 @@
+import { logger } from '@/lib/utils/logger'
 import { VideoEffect } from '@/types/effects'
 import * as PIXI from 'pixi.js'
-import { logger } from '@/lib/utils/logger'
 
 /**
  * VideoManager - Manages video effects on PIXI canvas
@@ -14,10 +14,14 @@ export class VideoManager {
       sprite: PIXI.Sprite
       element: HTMLVideoElement
       texture: PIXI.Texture
+      objectUrl?: string
     }
   >()
   // Prevent concurrent duplicate addVideo calls (race guard)
   private inFlightAdds = new Set<string>()
+  private objectUrls = new Map<string, string>()
+  private readonly MAX_RETRY_ATTEMPTS = 2
+  private failedAttempts = new Map<string, number>()
 
   constructor(
     private app: PIXI.Application,
@@ -40,6 +44,12 @@ export class VideoManager {
       return
     }
 
+    const attempts = this.failedAttempts.get(effect.id) || 0
+    if (attempts >= this.MAX_RETRY_ATTEMPTS) {
+      logger.warn(`VideoManager: Skipping addVideo for ${effect.id} after ${attempts} failed attempts`)
+      return
+    }
+
     try {
       this.inFlightAdds.add(effect.id)
       // Get video file URL from storage
@@ -48,13 +58,16 @@ export class VideoManager {
       // Create video element (omniclip:55-57)
       const element = document.createElement('video')
       element.src = fileUrl
-      element.preload = 'auto'
+      element.preload = 'metadata'
       element.crossOrigin = 'anonymous'
       element.width = effect.properties.rect.width
       element.height = effect.properties.rect.height
       // CRITICAL: Mute by default to allow autoplay (browser policy)
       // Audio will be handled separately by AudioManager
       element.muted = true
+      // iOS Safari 対応
+      element.setAttribute('playsinline', '')
+      element.setAttribute('muted', '')
       element.playsInline = true // Required for mobile devices
 
       // Create PIXI texture from video (omniclip:60-62)
@@ -74,7 +87,7 @@ export class VideoManager {
       sprite.cursor = 'pointer'
 
       // Wait for video metadata to load with explicit listener cleanup
-      await new Promise<void>((resolve, reject) => {
+      const waitForMetadata = () => new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           cleanup()
           reject(new Error('Video metadata load timeout'))
@@ -105,12 +118,40 @@ export class VideoManager {
         element.load()
       })
 
-      // Store reference
+      try {
+        await waitForMetadata()
+      } catch (firstError) {
+        // Fallback: fetch as blob and set object URL to bypass CORS peculiarities
+        try {
+          logger.warn(`VideoManager: Metadata failed for ${effect.id}, trying blob fallback`)
+          const res = await fetch(fileUrl, { cache: 'no-cache' })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const blob = await res.blob()
+          if (!blob.type || !blob.type.startsWith('video/')) {
+            throw new Error(`Invalid content type: ${blob.type || 'unknown'}`)
+          }
+          const objectUrl = URL.createObjectURL(blob)
+          element.src = objectUrl
+          await waitForMetadata()
+          // objectUrl は保存して remove 時に revoke
+          this.videos.set(effect.id, { sprite, element, texture, objectUrl })
+          this.objectUrls.set(effect.id, objectUrl)
+          logger.debug(`VideoManager: Using blob URL fallback for ${effect.id}`)
+          return
+        } catch (fallbackError) {
+          logger.error(`VideoManager: Blob fallback also failed for ${effect.id}:`, fallbackError)
+          throw firstError instanceof Error ? firstError : new Error(String(firstError))
+        }
+      }
+
+      // Store reference（通常パス）
       this.videos.set(effect.id, { sprite, element, texture })
 
       logger.info(`VideoManager: Added video effect ${effect.id}`)
+      this.failedAttempts.delete(effect.id)
     } catch (error) {
       logger.error(`VideoManager: Failed to add video ${effect.id}:`, error)
+      this.failedAttempts.set(effect.id, (this.failedAttempts.get(effect.id) || 0) + 1)
       throw error
     } finally {
       this.inFlightAdds.delete(effect.id)
@@ -236,6 +277,11 @@ export class VideoManager {
 
     // Cleanup
     video.element.pause()
+    const objectUrl = video.objectUrl || this.objectUrls.get(effectId)
+    if (objectUrl) {
+      try { URL.revokeObjectURL(objectUrl) } catch {}
+      this.objectUrls.delete(effectId)
+    }
     video.element.src = ''
     video.texture.destroy(true)
 
@@ -256,6 +302,11 @@ export class VideoManager {
       }
     })
     this.videos.clear()
+    // Revoke any remaining object URLs
+    for (const [id, url] of this.objectUrls.entries()) {
+      try { URL.revokeObjectURL(url) } catch {}
+      this.objectUrls.delete(id)
+    }
   }
 
   /**

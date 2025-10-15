@@ -249,7 +249,12 @@ export class Compositor {
     // FIXED: Only recompose if visible effects changed (performance optimization)
     // Prevents unnecessary composeEffects calls (60fps → ~2-5fps)
     if (this.allEffects.length > 0) {
-      void this.recomposeIfNeeded()
+      // Fire-and-forget: errors are logged but don't block the render loop
+      void this.recomposeIfNeeded().catch((err) => {
+        // Avoid spamming logs; could be upgraded to circuit breaker if needed
+        // Keep loop running but record an error once
+        logger.error('Compositor: Recompose failed:', err)
+      })
     }
 
     // CRITICAL: Update video textures for smooth playback
@@ -364,7 +369,7 @@ export class Compositor {
       this.currentlyPlayedEffects.delete(id)
     }
 
-    // Add new effects
+    // Add new effects（omniclip: 追加→シーク→ステージ追加→再生）
     for (const effect of toAdd) {
       // Guard: Check if destroyed during async operations
       if (this.isDestroyed) {
