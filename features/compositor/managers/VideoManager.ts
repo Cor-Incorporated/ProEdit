@@ -15,6 +15,8 @@ export class VideoManager {
       texture: PIXI.Texture
     }
   >()
+  // Prevent concurrent duplicate addVideo calls (race guard)
+  private inFlightAdds = new Set<string>()
 
   constructor(
     private app: PIXI.Application,
@@ -32,8 +34,13 @@ export class VideoManager {
       console.warn(`VideoManager: Video ${effect.id} already added, skipping`)
       return
     }
+    if (this.inFlightAdds.has(effect.id)) {
+      console.debug(`VideoManager: addVideo already in-flight for ${effect.id}, skipping duplicate call`)
+      return
+    }
 
     try {
+      this.inFlightAdds.add(effect.id)
       // Get video file URL from storage
       const fileUrl = await this.getMediaFileUrl(effect.media_file_id)
 
@@ -92,6 +99,8 @@ export class VideoManager {
     } catch (error) {
       console.error(`VideoManager: Failed to add video ${effect.id}:`, error)
       throw error
+    } finally {
+      this.inFlightAdds.delete(effect.id)
     }
   }
 
@@ -238,6 +247,22 @@ export class VideoManager {
       }
     })
     this.videos.clear()
+  }
+
+  /**
+   * Remove all cached videos not present in allowedIds and not currently on stage
+   */
+  pruneUnused(allowedIds: Set<string>): void {
+    for (const [id, data] of this.videos.entries()) {
+      const onStage = !!data.sprite.parent
+      if (!allowedIds.has(id) && !onStage) {
+        try {
+          this.remove(id)
+        } catch (error) {
+          console.warn(`VideoManager: prune failed for ${id}:`, error)
+        }
+      }
+    }
   }
 
   /**

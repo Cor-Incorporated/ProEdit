@@ -45,14 +45,14 @@ export default async function EditorLayout({ children }: { children: ReactNode }
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium">{user.email}</p>
-                  <p className="text-xs text-muted-foreground">Signed in</p>
+                  <p className="text-xs text-muted-foreground">サインイン中</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <form action={signOut}>
                     <button type="submit" className="w-full flex items-center">
                       <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
+                      サインアウト
                     </button>
                   </form>
                 </DropdownMenuItem>

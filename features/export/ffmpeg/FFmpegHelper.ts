@@ -92,6 +92,17 @@ export class FFmpegHelper {
     }
   }
 
+  /**
+   * Helper for preloading FFmpeg early (e.g., on editor mount)
+   */
+  static async preload(instance: FFmpegHelper): Promise<void> {
+    try {
+      await instance.load()
+    } catch (e) {
+      console.warn('[FFmpeg] Preload failed, will retry on demand:', e)
+    }
+  }
+
   // Ported from omniclip Line 32-34
   async writeFile(name: string, data: Uint8Array): Promise<void> {
     if (!this.isLoaded) {

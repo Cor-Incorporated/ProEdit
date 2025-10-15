@@ -430,6 +430,14 @@ export class Compositor {
       // Sort children by z-index
       this.app.stage.sortChildren()
     }
+
+    // Prune any cached media that is no longer referenced (memory guard)
+    try {
+      const allowedIds = new Set(newEffects.filter(isVideoEffect).map(e => e.id))
+      this.videoManager.pruneUnused(allowedIds)
+    } catch {
+      // ignore prune errors
+    }
   }
 
   /**
