@@ -1,6 +1,6 @@
+import { logger } from '@/lib/utils/logger'
 import { VideoEffect } from '@/types/effects'
 import * as PIXI from 'pixi.js'
-import { logger } from '@/lib/utils/logger'
 
 /**
  * VideoManager - Manages video effects on PIXI canvas
@@ -14,6 +14,7 @@ export class VideoManager {
       sprite: PIXI.Sprite
       element: HTMLVideoElement
       texture: PIXI.Texture
+      objectUrl?: string
     }
   >()
   // Prevent concurrent duplicate addVideo calls (race guard)
@@ -62,6 +63,9 @@ export class VideoManager {
       // CRITICAL: Mute by default to allow autoplay (browser policy)
       // Audio will be handled separately by AudioManager
       element.muted = true
+      // iOS Safari 対応
+      element.setAttribute('playsinline', '')
+      element.setAttribute('muted', '')
       element.playsInline = true // Required for mobile devices
 
       // Create PIXI texture from video (omniclip:60-62)
@@ -124,12 +128,16 @@ export class VideoManager {
           const objectUrl = URL.createObjectURL(blob)
           element.src = objectUrl
           await waitForMetadata()
+          // objectUrl は保存して remove 時に revoke
+          this.videos.set(effect.id, { sprite, element, texture, objectUrl })
+          logger.debug(`VideoManager: Using blob URL fallback for ${effect.id}`)
+          return
         } catch {
           throw firstError instanceof Error ? firstError : new Error(String(firstError))
         }
       }
 
-      // Store reference
+      // Store reference（通常パス）
       this.videos.set(effect.id, { sprite, element, texture })
 
       logger.info(`VideoManager: Added video effect ${effect.id}`)
@@ -262,6 +270,9 @@ export class VideoManager {
 
     // Cleanup
     video.element.pause()
+    if (video.objectUrl) {
+      try { URL.revokeObjectURL(video.objectUrl) } catch {}
+    }
     video.element.src = ''
     video.texture.destroy(true)
 

@@ -368,7 +368,7 @@ export class Compositor {
       this.currentlyPlayedEffects.delete(id)
     }
 
-    // Add new effects
+    // Add new effects（omniclip: 追加→シーク→ステージ追加→再生）
     for (const effect of toAdd) {
       // Guard: Check if destroyed during async operations
       if (this.isDestroyed) {
