@@ -19,6 +19,8 @@ export class VideoManager {
   >()
   // Prevent concurrent duplicate addVideo calls (race guard)
   private inFlightAdds = new Set<string>()
+  private objectUrls = new Map<string, string>()
+  private readonly MAX_RETRY_ATTEMPTS = 2
   private failedAttempts = new Map<string, number>()
 
   constructor(
@@ -43,7 +45,7 @@ export class VideoManager {
     }
 
     const attempts = this.failedAttempts.get(effect.id) || 0
-    if (attempts >= 2) {
+    if (attempts >= this.MAX_RETRY_ATTEMPTS) {
       logger.warn(`VideoManager: Skipping addVideo for ${effect.id} after ${attempts} failed attempts`)
       return
     }
@@ -122,17 +124,22 @@ export class VideoManager {
         // Fallback: fetch as blob and set object URL to bypass CORS peculiarities
         try {
           logger.warn(`VideoManager: Metadata failed for ${effect.id}, trying blob fallback`)
-          const res = await fetch(fileUrl, { cache: 'no-store' })
+          const res = await fetch(fileUrl, { cache: 'no-cache' })
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const blob = await res.blob()
+          if (!blob.type || !blob.type.startsWith('video/')) {
+            throw new Error(`Invalid content type: ${blob.type || 'unknown'}`)
+          }
           const objectUrl = URL.createObjectURL(blob)
           element.src = objectUrl
           await waitForMetadata()
           // objectUrl は保存して remove 時に revoke
           this.videos.set(effect.id, { sprite, element, texture, objectUrl })
+          this.objectUrls.set(effect.id, objectUrl)
           logger.debug(`VideoManager: Using blob URL fallback for ${effect.id}`)
           return
-        } catch {
+        } catch (fallbackError) {
+          logger.error(`VideoManager: Blob fallback also failed for ${effect.id}:`, fallbackError)
           throw firstError instanceof Error ? firstError : new Error(String(firstError))
         }
       }
@@ -270,8 +277,10 @@ export class VideoManager {
 
     // Cleanup
     video.element.pause()
-    if (video.objectUrl) {
-      try { URL.revokeObjectURL(video.objectUrl) } catch {}
+    const objectUrl = video.objectUrl || this.objectUrls.get(effectId)
+    if (objectUrl) {
+      try { URL.revokeObjectURL(objectUrl) } catch {}
+      this.objectUrls.delete(effectId)
     }
     video.element.src = ''
     video.texture.destroy(true)
@@ -293,6 +302,11 @@ export class VideoManager {
       }
     })
     this.videos.clear()
+    // Revoke any remaining object URLs
+    for (const [id, url] of this.objectUrls.entries()) {
+      try { URL.revokeObjectURL(url) } catch {}
+      this.objectUrls.delete(id)
+    }
   }
 
   /**

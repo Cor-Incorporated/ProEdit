@@ -249,7 +249,8 @@ export class Compositor {
     // FIXED: Only recompose if visible effects changed (performance optimization)
     // Prevents unnecessary composeEffects calls (60fps → ~2-5fps)
     if (this.allEffects.length > 0) {
-      this.recomposeIfNeeded().catch((err) => {
+      // Fire-and-forget: errors are logged but don't block the render loop
+      void this.recomposeIfNeeded().catch((err) => {
         // Avoid spamming logs; could be upgraded to circuit breaker if needed
         // Keep loop running but record an error once
         logger.error('Compositor: Recompose failed:', err)
