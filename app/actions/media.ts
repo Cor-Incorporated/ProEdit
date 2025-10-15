@@ -222,8 +222,8 @@ export async function deleteMedia(mediaId: string): Promise<void> {
 
   if (!media) throw new Error('Media not found')
 
-  // CRITICAL: Delete all effects that reference this media file first
-  // This prevents foreign key constraint violations
+  // Delete from database first (DB state remains consistent even if storage deletion fails)
+  // 1) Delete effects referencing this media (FK consistency)
   const { error: effectsError } = await supabase
     .from('effects')
     .delete()
@@ -234,10 +234,7 @@ export async function deleteMedia(mediaId: string): Promise<void> {
     throw new Error(`Failed to delete associated effects: ${effectsError.message}`)
   }
 
-  // Delete from storage
-  await deleteMediaFile(media.storage_path)
-
-  // Delete from database
+  // 2) Delete media DB row
   const { error } = await supabase
     .from('media_files')
     .delete()
@@ -247,6 +244,13 @@ export async function deleteMedia(mediaId: string): Promise<void> {
   if (error) {
     console.error('Delete media error:', error)
     throw new Error(error.message)
+  }
+
+  // 3) Delete from storage (best-effort)
+  try {
+    await deleteMediaFile(media.storage_path)
+  } catch (storageError) {
+    console.warn('Storage deletion failed after DB cleanup:', storageError)
   }
 
   revalidatePath('/editor')

@@ -8,10 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -57,7 +59,9 @@ export default function LoginPage() {
         setError(error.message);
         setIsLoading(false);
       } else {
-        window.location.href = "/editor";
+        // セッションはmiddlewareで検証される。CSRはrouterで遷移して再検証を促す
+        router.push("/editor");
+        router.refresh();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "予期しないエラーが発生しました");
@@ -65,11 +69,25 @@ export default function LoginPage() {
     }
   };
 
+  const validatePassword = useMemo(() => (pwd: string): string | null => {
+    if (pwd.length < 8) return "パスワードは8文字以上必要です";
+    if (!/[A-Z]/.test(pwd)) return "パスワードには大文字を含めてください";
+    if (!/[a-z]/.test(pwd)) return "パスワードには小文字を含めてください";
+    if (!/[0-9]/.test(pwd)) return "パスワードには数字を含めてください";
+    return null;
+  }, []);
+
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
       setError("パスワードが一致しません");
+      return;
+    }
+
+    const pwdErr = validatePassword(password);
+    if (pwdErr) {
+      setError(pwdErr);
       return;
     }
 
@@ -91,7 +109,8 @@ export default function LoginPage() {
         setIsLoading(false);
       } else {
         setError(null);
-        alert("確認メールを送信しました。メールを確認してアカウントを有効化してください。");
+        // 確認ページに誘導
+        router.push("/auth/verify-email");
         setIsLoading(false);
       }
     } catch (err) {

@@ -17,6 +17,10 @@ export function useMediaUpload(projectId: string) {
   const [progress, setProgress] = useState(0)
   const { addMediaFile, setUploadProgress } = useMediaStore()
 
+  // Soft rate limiting: total size gate
+  const MAX_TOTAL_UPLOAD_BYTES = 512 * 1024 * 1024 // 512MB/リクエストの目安
+  const MAX_SINGLE_FILE_BYTES = 2 * 1024 * 1024 * 1024 // サーバー側と整合(2GB)
+
   /**
    * Upload multiple files with deduplication
    * Client-side direct upload to Supabase Storage
@@ -27,6 +31,13 @@ export function useMediaUpload(projectId: string) {
     async (files: File[]): Promise<MediaFile[]> => {
       setIsUploading(true)
       setProgress(0)
+
+      // Basic rate limiting: block too large batches
+      const totalBytes = files.reduce((a, f) => a + f.size, 0)
+      if (totalBytes > MAX_TOTAL_UPLOAD_BYTES) {
+        setIsUploading(false)
+        throw new Error('アップロードサイズが大きすぎます。ファイルを分割してアップロードしてください。')
+      }
 
       try {
         const supabase = createClient()
@@ -39,6 +50,10 @@ export function useMediaUpload(projectId: string) {
 
         for (let i = 0; i < files.length; i++) {
           const file = files[i]
+
+          if (file.size > MAX_SINGLE_FILE_BYTES) {
+            throw new Error('このファイルはサイズ上限(2GB)を超えています')
+          }
 
           // Calculate progress for hash and metadata extraction
           const fileProgress = (i / totalFiles) * 100

@@ -29,6 +29,12 @@ interface CompositorState {
     stop: () => void
     seek: (ms: number) => void
   }) => void
+  compositorApi?: {
+    play: () => void
+    pause: () => void
+    stop: () => void
+    seek: (ms: number) => void
+  }
   play: () => void
   pause: () => void
   stop: () => void
@@ -46,12 +52,7 @@ export const useCompositorStore = create<CompositorState>()(
       fps: 30,
       actualFps: 0,
       canvasReady: false,
-      _compositorApi: undefined as unknown as {
-        play: () => void
-        pause: () => void
-        stop: () => void
-        seek: (ms: number) => void
-      } | undefined,
+      compositorApi: undefined,
 
       // Actions
       setPlaying: (playing) => set({ isPlaying: playing }),
@@ -61,20 +62,20 @@ export const useCompositorStore = create<CompositorState>()(
       setActualFps: (fps) => set({ actualFps: fps }),
       setCanvasReady: (ready) => set({ canvasReady: ready }),
 
-      bindCompositor: (api) => set({ _compositorApi: api }),
+      bindCompositor: (api) => set({ compositorApi: api }),
 
       play: () => {
-        const api = (get() as any)._compositorApi
+        const api = get().compositorApi
         api?.play?.()
         set({ isPlaying: true })
       },
       pause: () => {
-        const api = (get() as any)._compositorApi
+        const api = get().compositorApi
         api?.pause?.()
         set({ isPlaying: false })
       },
       stop: () => {
-        const api = (get() as any)._compositorApi
+        const api = get().compositorApi
         api?.stop?.()
         set({ isPlaying: false, timecode: 0 })
       },
@@ -82,14 +83,14 @@ export const useCompositorStore = create<CompositorState>()(
       seek: (timecode) => {
         const { duration } = get()
         const clampedTimecode = Math.max(0, Math.min(timecode, duration))
-        const api = (get() as any)._compositorApi
+        const api = get().compositorApi
         api?.seek?.(clampedTimecode)
         set({ timecode: clampedTimecode })
       },
 
       togglePlayPause: () => {
         const { isPlaying } = get()
-        const api = (get() as any)._compositorApi
+        const api = get().compositorApi
         if (isPlaying) {
           api?.pause?.()
         } else {
