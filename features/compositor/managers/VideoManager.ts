@@ -24,8 +24,15 @@ export class VideoManager {
   /**
    * Add video effect to canvas
    * Ported from omniclip:54-100
+   * GUARD: Prevent duplicate additions
    */
   async addVideo(effect: VideoEffect): Promise<void> {
+    // CRITICAL: Check if already added to prevent duplicates
+    if (this.videos.has(effect.id)) {
+      console.warn(`VideoManager: Video ${effect.id} already added, skipping`)
+      return
+    }
+
     try {
       // Get video file URL from storage
       const fileUrl = await this.getMediaFileUrl(effect.media_file_id)
@@ -37,6 +44,10 @@ export class VideoManager {
       element.crossOrigin = 'anonymous'
       element.width = effect.properties.rect.width
       element.height = effect.properties.rect.height
+      // CRITICAL: Mute by default to allow autoplay (browser policy)
+      // Audio will be handled separately by AudioManager
+      element.muted = true
+      element.playsInline = true // Required for mobile devices
 
       // Create PIXI texture from video (omniclip:60-62)
       const texture = PIXI.Texture.from(element)
@@ -53,6 +64,26 @@ export class VideoManager {
       sprite.height = effect.properties.rect.height
       sprite.eventMode = 'static'
       sprite.cursor = 'pointer'
+
+      // Wait for video metadata to load
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Video metadata load timeout'))
+        }, 5000) // 5 second timeout
+
+        element.addEventListener('loadedmetadata', () => {
+          clearTimeout(timeout)
+          resolve()
+        }, { once: true })
+
+        element.addEventListener('error', (e) => {
+          clearTimeout(timeout)
+          reject(new Error(`Video load error: ${e.message || 'Unknown error'}`))
+        }, { once: true })
+
+        // Trigger load
+        element.load()
+      })
 
       // Store reference
       this.videos.set(effect.id, { sprite, element, texture })
@@ -120,15 +151,31 @@ export class VideoManager {
   /**
    * Play video element
    * Ported from omniclip:75-76, 219
+   * FIXED: Handle autoplay policy errors gracefully
    */
   async play(effectId: string): Promise<void> {
     const video = this.videos.get(effectId)
     if (!video) return
 
+    // Check if video is ready to play
+    if (!this.isVideoElementReady(effectId)) {
+      console.debug(`VideoManager: Video ${effectId} not ready yet, skipping play`)
+      return
+    }
+
     if (video.element.paused) {
-      await video.element.play().catch((error) => {
-        console.warn(`VideoManager: Play failed for ${effectId}:`, error)
-      })
+      try {
+        await video.element.play()
+        console.debug(`VideoManager: Playing ${effectId}`)
+      } catch (error) {
+        // Autoplay failed - this is expected on first load without user interaction
+        // The video will play once the user interacts with the page (e.g., clicks play button)
+        if (error instanceof Error && error.name === 'NotAllowedError') {
+          console.debug(`VideoManager: Autoplay blocked for ${effectId} - waiting for user interaction`)
+        } else {
+          console.warn(`VideoManager: Play failed for ${effectId}:`, error)
+        }
+      }
     }
   }
 
@@ -202,8 +249,18 @@ export class VideoManager {
 
   /**
    * Check if video is loaded and ready
+   * FIXED: Simply check if video exists in map (already added)
+   * readyState check is unreliable during initial load
    */
   isReady(effectId: string): boolean {
+    return this.videos.has(effectId)
+  }
+
+  /**
+   * Check if video element is ready to play
+   * Used for playback control
+   */
+  isVideoElementReady(effectId: string): boolean {
     const video = this.videos.get(effectId)
     return video !== undefined && video.element.readyState >= 2 // HAVE_CURRENT_DATA
   }

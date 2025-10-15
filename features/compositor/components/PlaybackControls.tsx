@@ -1,8 +1,8 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 import { useCompositorStore } from '@/stores/compositor'
+import { Pause, Play, SkipBack, SkipForward, Square } from 'lucide-react'
 
 interface PlaybackControlsProps {
   onPlay?: () => void
@@ -19,7 +19,7 @@ export function PlaybackControls({
   onSeekBackward,
   onSeekForward,
 }: PlaybackControlsProps) {
-  const { isPlaying, timecode, duration, togglePlayPause, stop } = useCompositorStore()
+  const { isPlaying, timecode, duration, togglePlayPause, stop, seek } = useCompositorStore()
 
   // Format timecode to MM:SS.mmm
   const formatTimecode = (ms: number): string => {
@@ -45,10 +45,12 @@ export function PlaybackControls({
   }
 
   const handleSeekBackward = () => {
+    seek(Math.max(0, timecode - 1000))
     onSeekBackward?.()
   }
 
   const handleSeekForward = () => {
+    seek(Math.min(duration, timecode + 1000))
     onSeekForward?.()
   }
 
@@ -61,7 +63,7 @@ export function PlaybackControls({
           size="icon"
           onClick={handleSeekBackward}
           disabled={timecode === 0}
-          title="Seek Backward (←)"
+          title="1秒戻る (←)"
         >
           <SkipBack className="h-4 w-4" />
         </Button>
@@ -70,7 +72,7 @@ export function PlaybackControls({
           variant="default"
           size="icon"
           onClick={handlePlayPause}
-          title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+          title={isPlaying ? '一時停止 (Space)' : '再生 (Space)'}
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
@@ -78,9 +80,18 @@ export function PlaybackControls({
         <Button
           variant="ghost"
           size="icon"
+          onClick={() => { stop(); seek(0) }}
+          title="停止 / 先頭へ"
+        >
+          <Square className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleSeekForward}
           disabled={timecode >= duration}
-          title="Seek Forward (→)"
+          title="1秒進む (→)"
         >
           <SkipForward className="h-4 w-4" />
         </Button>

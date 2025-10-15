@@ -11,7 +11,8 @@ import { TextEditor } from '@/features/effects/components/TextEditor'
 import { ExportDialog } from '@/features/export/components/ExportDialog'
 import { ExportQuality } from '@/features/export/types'
 import { downloadFile } from '@/features/export/utils/download'
-import { ExportController } from '@/features/export/utils/ExportController'
+// Dynamic import for ExportController (FFmpeg.wasm compatibility)
+import type { ExportController } from '@/features/export/utils/ExportController'
 import { MediaLibrary } from '@/features/media/components/MediaLibrary'
 import { Timeline } from '@/features/timeline/components/Timeline'
 import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
@@ -21,9 +22,10 @@ import { TextEffect } from '@/types/effects'
 import { Project } from '@/types/project'
 import { Download, PanelRightOpen, Type } from 'lucide-react'
 import * as PIXI from 'pixi.js'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 // Phase 9: Auto-save imports (AutoSaveManager managed by Zustand)
+import { ServiceWorkerDebug } from '@/app/sw-debug'
 import { ConflictResolutionDialog } from '@/components/ConflictResolutionDialog'
 import { RecoveryModal } from '@/components/RecoveryModal'
 import { SaveIndicatorCompact } from '@/components/SaveIndicator'
@@ -59,6 +61,7 @@ export function EditorClient({ project }: EditorClientProps) {
     setFps,
     setDuration,
     setActualFps,
+    bindCompositor,
   } = useCompositorStore()
 
   const { effects, updateEffect } = useTimelineStore()
@@ -83,7 +86,7 @@ export function EditorClient({ project }: EditorClientProps) {
     // Initialize realtime sync
     syncManagerRef.current = new RealtimeSyncManager(project.id, {
       onRemoteChange: (data) => {
-        console.log('[Editor] Remote changes detected:', data)
+        console.log('[エディタ] リモート変更を検出:', data)
         // Reload effects from server
         // This would trigger a re-fetch in a real implementation
       },
@@ -114,7 +117,9 @@ export function EditorClient({ project }: EditorClientProps) {
   }, [effects, setDuration])
 
   // Handle canvas ready
-  const handleCanvasReady = (app: PIXI.Application) => {
+  // CRITICAL FIX: Use useCallback to prevent Canvas re-mounting on every render
+  // Without this, Canvas useEffect runs infinitely because onAppReady changes
+  const handleCanvasReady = useCallback((app: PIXI.Application) => {
     // Create compositor instance with TextManager support
     const compositor = new Compositor(
       app,
@@ -136,8 +141,16 @@ export function EditorClient({ project }: EditorClientProps) {
 
     compositorRef.current = compositor
 
-    console.log('EditorClient: Compositor initialized with TextManager')
-  }
+    // Bind Compositor control APIs to store so UI/keyboard seek actually controls engine
+    bindCompositor({
+      play: () => compositor.play(),
+      pause: () => compositor.pause(),
+      stop: () => compositor.stop(),
+      seek: (ms: number) => { void compositor.seek(ms) },
+    })
+
+    // 上記は開発用ログ
+  }, [project.settings.fps, setTimecode, setActualFps, updateEffect])
 
   // Phase 7 T077: Handle text effect creation/update
   const handleTextSave = async (textEffect: TextEffect) => {
@@ -146,19 +159,19 @@ export function EditorClient({ project }: EditorClientProps) {
         // Update existing text effect
         const updated = await updateTextEffectStyle(textEffect.id, textEffect.properties)
         updateEffect(textEffect.id, updated)
-        toast.success('Text updated')
+        toast.success('テキストを更新しました')
       } else {
         // Create new text effect
         const created = await createTextEffect(project.id, textEffect.properties.text)
         // Add to timeline store
         useTimelineStore.getState().addEffect(created)
-        toast.success('Text added to timeline')
+        toast.success('テキストをタイムラインに追加しました')
       }
       setTextEditorOpen(false)
       setSelectedTextEffect(null)
     } catch (error) {
       console.error('Text save error:', error)
-      toast.error('Failed to save text')
+      toast.error('テキストの保存に失敗しました')
     }
   }
 
@@ -181,15 +194,30 @@ export function EditorClient({ project }: EditorClientProps) {
     }
   }
 
-  // Sync effects with compositor when they change
+  // Memoize effects IDs to detect actual changes
+  // This prevents unnecessary updates when effects array reference changes without content changes
+  const effectIds = useMemo(() => 
+    effects.map(e => e.id).sort().join(','),
+    [effects]
+  )
+
+  // Sync effects with compositor when they actually change
   // FIXED: Let Compositor handle playback loop, React only updates on effects changes
+  // OPTIMIZED: Only update when effect IDs actually change (not just array reference)
   useEffect(() => {
     if (!compositorRef.current) return
     
+    const compositor = compositorRef.current
+    
     // Store effects in Compositor so playback loop can access them
-    // This allows the loop to update effect visibility every frame
-    compositorRef.current.setEffects(effects)
-  }, [effects])
+    compositor.setEffects(effects)
+    
+    // If paused, explicitly recompose at current timecode
+    // (playing compositor will recompose automatically on next frame)
+    if (!compositor.getIsPlaying()) {
+      void compositor.composeEffects(effects, compositor.getTimecode())
+    }
+  }, [effectIds, effects]) // Only trigger when effectIds change
 
   // Handle export with progress callback
   const handleExport = async (
@@ -202,19 +230,20 @@ export function EditorClient({ project }: EditorClientProps) {
     }) => void
   ) => {
     if (!compositorRef.current) {
-      toast.error('Compositor not initialized')
+      toast.error('コンポジタが初期化されていません')
       throw new Error('Compositor not initialized')
     }
 
     if (effects.length === 0) {
-      toast.error('No effects to export')
+      toast.error('エクスポートするエフェクトがありません')
       throw new Error('No effects to export')
     }
 
     try {
-      // Initialize export controller
+      // Dynamically import ExportController (FFmpeg.wasm compatibility)
       if (!exportControllerRef.current) {
-        exportControllerRef.current = new ExportController()
+        const { ExportController: ExportControllerClass } = await import('@/features/export/utils/ExportController')
+        exportControllerRef.current = new ExportControllerClass()
       }
 
       const controller = exportControllerRef.current
@@ -242,30 +271,42 @@ export function EditorClient({ project }: EditorClientProps) {
       // Download exported file
       downloadFile(result.file, result.filename)
 
-      toast.success('Export completed successfully!')
+      toast.success('エクスポートが完了しました！')
     } catch (error) {
       console.error('Export error:', error)
-      toast.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast.error(`エクスポートに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
       throw error
     }
   }
 
   // Cleanup on unmount
+  // CRITICAL: Compositor must be destroyed BEFORE Canvas cleanup
+  // This ensures proper cleanup order: Compositor managers → PIXI app
   useEffect(() => {
     return () => {
+      // Destroy Compositor first (cleans up managers and removes sprites)
       if (compositorRef.current) {
         compositorRef.current.destroy()
+        compositorRef.current = null
       }
+      
+      // Destroy ExportController
       if (exportControllerRef.current) {
         exportControllerRef.current.terminate()
+        exportControllerRef.current = null
       }
+      
+      // Canvas cleanup (app.destroy) will happen automatically in Canvas component
     }
   }, [])
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Preview Area - ✅ Phase 5実装 */}
-      <div className="flex-1 relative flex items-center justify-center bg-muted/30 border-b border-border">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Service Worker Debug (FFmpeg.wasm requirement) */}
+      <ServiceWorkerDebug />
+
+      {/* Preview Area - Fixed max height to ensure timeline visibility */}
+      <div className="flex-1 min-h-0 relative flex items-center justify-center bg-muted/30 border-b border-border overflow-hidden">
         <Canvas
           width={project.settings.width}
           height={project.settings.height}
@@ -274,28 +315,32 @@ export function EditorClient({ project }: EditorClientProps) {
 
         <FPSCounter />
 
-        <Button
-          variant="outline"
-          className="absolute top-4 left-4"
-          onClick={() => setMediaLibraryOpen(true)}
-        >
-          <PanelRightOpen className="h-4 w-4 mr-2" />
-          Open Media Library
-        </Button>
+        {/* Control buttons - top left with proper spacing */}
+        <div className="absolute top-4 left-4 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setMediaLibraryOpen(true)}
+          >
+            <PanelRightOpen className="h-4 w-4 mr-2" />
+            メディアライブラリ
+          </Button>
 
-        {/* Phase 7 T077: Add Text Button */}
-        <Button
-          variant="outline"
-          className="absolute top-4 left-48"
-          onClick={() => {
-            setSelectedTextEffect(null)
-            setTextEditorOpen(true)
-          }}
-        >
-          <Type className="h-4 w-4 mr-2" />
-          Add Text
-        </Button>
+          {/* Phase 7 T077: Add Text Button */}
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => {
+              setSelectedTextEffect(null)
+              setTextEditorOpen(true)
+            }}
+          >
+            <Type className="h-4 w-4 mr-2" />
+            テキストを追加
+          </Button>
+        </div>
 
+        {/* Export button - top right */}
         <Button
           variant="default"
           className="absolute top-4 right-4"
@@ -303,19 +348,21 @@ export function EditorClient({ project }: EditorClientProps) {
           disabled={effects.length === 0}
         >
           <Download className="h-4 w-4 mr-2" />
-          Export
+          エクスポート
         </Button>
       </div>
 
-      {/* Playback Controls */}
-      <PlaybackControls
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onStop={handleStop}
-      />
+      {/* Playback Controls - Fixed height */}
+      <div className="flex-shrink-0">
+        <PlaybackControls
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
+        />
+      </div>
 
-      {/* Timeline Area - Phase 4完了 */}
-      <div className="h-80 border-t border-border">
+      {/* Timeline Area - Fixed height, always visible */}
+      <div className="flex-shrink-0 h-80 border-t border-border overflow-hidden">
         <Timeline projectId={project.id} />
       </div>
 
@@ -371,13 +418,13 @@ export function EditorClient({ project }: EditorClientProps) {
       <RecoveryModal
         isOpen={showRecoveryModal}
         onRecover={() => {
-          console.log('[Editor] Recovering unsaved changes')
+          console.log('[エディタ] 未保存の変更を復元')
           localStorage.removeItem(`proedit_recovery_${project.id}`)
           setShowRecoveryModal(false)
-          toast.success('Changes recovered successfully')
+          toast.success('変更を復元しました')
         }}
         onDiscard={() => {
-          console.log('[Editor] Discarding unsaved changes')
+          console.log('[エディタ] 未保存の変更を破棄')
           localStorage.removeItem(`proedit_recovery_${project.id}`)
           setShowRecoveryModal(false)
         }}

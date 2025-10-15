@@ -12,7 +12,7 @@ export function FPSCounter() {
   }
 
   return (
-    <div className="fps-counter absolute top-4 right-4 bg-black/80 px-3 py-1 rounded text-xs font-mono">
+    <div className="fps-counter absolute top-4 right-56 bg-black/80 px-3 py-1 rounded text-xs font-mono z-10">
       <span className={getFpsColor()}>{actualFps.toFixed(1)} fps</span>
       <span className="text-muted-foreground ml-2">/ {fps} fps target</span>
     </div>

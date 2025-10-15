@@ -132,14 +132,46 @@ export class AutoSaveManager {
 
   /**
    * Perform the actual save operation
+   * FIXED: Filter out effects with invalid media_file_id references
    */
   private async performSave(): Promise<void> {
     const timelineState = useTimelineStore.getState();
     const mediaState = useMediaStore.getState();
 
+    // Get valid media file IDs
+    const validMediaIds = new Set(mediaState.mediaFiles.map(m => m.id));
+
+    // CRITICAL: Filter out effects that reference deleted media files
+    // This prevents foreign key constraint violations
+    const validEffects = timelineState.effects.filter(effect => {
+      // Text effects don't have media_file_id
+      if (effect.kind === 'text') {
+        return true;
+      }
+      
+      // Check if media_file_id exists and is valid
+      if (!effect.media_file_id) {
+        logger.warn(`[AutoSave] Effect ${effect.id} has no media_file_id, skipping`);
+        return false;
+      }
+      
+      const isValid = validMediaIds.has(effect.media_file_id);
+      if (!isValid) {
+        logger.warn(`[AutoSave] Effect ${effect.id} references deleted media ${effect.media_file_id}, removing from store`);
+        // Remove from store to prevent future errors
+        useTimelineStore.getState().removeEffect(effect.id);
+      }
+      
+      return isValid;
+    });
+
+    if (validEffects.length < timelineState.effects.length) {
+      logger.info(`[AutoSave] Filtered out ${timelineState.effects.length - validEffects.length} invalid effect(s)`);
+    }
+
     // Gather all data to save
     const projectData = {
-      effects: timelineState.effects,
+      effects: validEffects,
       mediaFiles: mediaState.mediaFiles,
       lastModified: new Date().toISOString(),
     };

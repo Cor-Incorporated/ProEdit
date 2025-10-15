@@ -69,20 +69,21 @@ export function isImageMetadata(metadata: MediaMetadata): metadata is ImageMetad
 }
 
 // File size limits
-export const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+// Updated to 2GB to match Supabase Storage configuration
+export const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB (was 500MB)
 export const MAX_STORAGE_PER_USER = 10 * 1024 * 1024 * 1024; // 10GB
 
-// Supported MIME types
-export const SUPPORTED_VIDEO_TYPES = [
+// Supported MIME types (for validation)
+export const SUPPORTED_VIDEO_MIME_TYPES = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
   "video/x-matroska",
 ];
 
-export const SUPPORTED_AUDIO_TYPES = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"];
+export const SUPPORTED_AUDIO_MIME_TYPES = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"];
 
-export const SUPPORTED_IMAGE_TYPES = [
+export const SUPPORTED_IMAGE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
@@ -90,8 +91,13 @@ export const SUPPORTED_IMAGE_TYPES = [
   "image/svg+xml",
 ];
 
-export const ALL_SUPPORTED_TYPES = [
-  ...SUPPORTED_VIDEO_TYPES,
-  ...SUPPORTED_AUDIO_TYPES,
-  ...SUPPORTED_IMAGE_TYPES,
+export const ALL_SUPPORTED_MIME_TYPES = [
+  ...SUPPORTED_VIDEO_MIME_TYPES,
+  ...SUPPORTED_AUDIO_MIME_TYPES,
+  ...SUPPORTED_IMAGE_MIME_TYPES,
 ];
+
+// File extensions for react-dropzone accept prop (v14+)
+export const SUPPORTED_VIDEO_TYPES = [".mp4", ".webm", ".mov", ".mkv"];
+export const SUPPORTED_AUDIO_TYPES = [".mp3", ".wav", ".ogg", ".webm"];
+export const SUPPORTED_IMAGE_TYPES = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];

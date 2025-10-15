@@ -2,7 +2,7 @@
 
 // T069: Selection Box Component for multi-selection on timeline
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTimelineStore } from '@/stores/timeline'
 import { Effect } from '@/types/effects'
 
@@ -44,22 +44,23 @@ export function SelectionBox() {
   }
 
   // Handle mouse move while selecting
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isSelecting || !containerRef.current) return
+  // FIXED: Use useCallback to prevent infinite loop in useEffect
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!containerRef.current) return
 
     const rect = containerRef.current.getBoundingClientRect()
     const endX = e.clientX - rect.left
     const endY = e.clientY - rect.top
 
     setSelectionBox((prev) => ({ ...prev, endX, endY }))
-  }
+  }, [])
 
   // Handle mouse up to finish selection
-  const handleMouseUp = () => {
-    if (!isSelecting) return
-
+  // FIXED: Use useCallback to prevent infinite loop in useEffect
+  const handleMouseUp = useCallback(() => {
     // Calculate which effects are within selection box
-    const selectedIds = getEffectsInBox(selectionBox, effects, zoom)
+    const currentBox = selectionBox
+    const selectedIds = getEffectsInBox(currentBox, effects, zoom)
 
     // Update selected effects (replace existing selection unless Shift key is held)
     // For simplicity, always replace for now - Shift+click on individual blocks handled separately
@@ -69,7 +70,7 @@ export function SelectionBox() {
 
     setIsSelecting(false)
     setSelectionBox({ startX: 0, startY: 0, endX: 0, endY: 0 })
-  }
+  }, [selectionBox, effects, zoom])
 
   // Handle Esc key to clear selection
   useEffect(() => {
@@ -84,6 +85,8 @@ export function SelectionBox() {
   }, [clearSelection])
 
   // Add mouse move/up listeners when selecting
+  // FIXED: Removed selectionBox from deps to prevent infinite loop
+  // The selectionBox state change should NOT trigger re-adding listeners
   useEffect(() => {
     if (!isSelecting) return
 
@@ -94,7 +97,7 @@ export function SelectionBox() {
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isSelecting, selectionBox])
+  }, [isSelecting, handleMouseMove, handleMouseUp])
 
   // Calculate selection box styles
   const boxStyles = isSelecting

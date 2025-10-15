@@ -1,125 +1,152 @@
-'use client'
+"use client";
 
-import { MediaFile, isVideoMetadata, isAudioMetadata, isImageMetadata } from '@/types/media'
-import { Card } from '@/components/ui/card'
-import { FileVideo, FileAudio, FileImage, Trash2, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useState } from 'react'
-import { deleteMedia } from '@/app/actions/media'
-import { createEffectFromMediaFile } from '@/app/actions/effects'
-import { useMediaStore } from '@/stores/media'
-import { useTimelineStore } from '@/stores/timeline'
-import { toast } from 'sonner'
+import { createEffectFromMediaFile } from "@/app/actions/effects";
+import { deleteMedia } from "@/app/actions/media";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useMediaStore } from "@/stores/media";
+import { useTimelineStore } from "@/stores/timeline";
+import { MediaFile, isAudioMetadata, isImageMetadata, isVideoMetadata } from "@/types/media";
+import { FileAudio, FileImage, FileVideo, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface MediaCardProps {
-  media: MediaFile
-  projectId: string
+  media: MediaFile;
+  projectId: string;
 }
 
 export function MediaCard({ media, projectId }: MediaCardProps) {
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isAdding, setIsAdding] = useState(false)
-  const { removeMediaFile, toggleMediaSelection, selectedMediaIds } = useMediaStore()
-  const { addEffect } = useTimelineStore()
-  const isSelected = selectedMediaIds.includes(media.id)
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const { removeMediaFile, toggleMediaSelection, selectedMediaIds } = useMediaStore();
+  const { addEffect } = useTimelineStore();
+  const isSelected = selectedMediaIds.includes(media.id);
 
   // Get icon based on media type
   const getIcon = () => {
     if (isVideoMetadata(media.metadata)) {
-      return <FileVideo className="h-12 w-12 text-muted-foreground" />
+      return <FileVideo className="h-12 w-12 text-muted-foreground" />;
     } else if (isAudioMetadata(media.metadata)) {
-      return <FileAudio className="h-12 w-12 text-muted-foreground" />
+      return <FileAudio className="h-12 w-12 text-muted-foreground" />;
     } else if (isImageMetadata(media.metadata)) {
-      return <FileImage className="h-12 w-12 text-muted-foreground" />
+      return <FileImage className="h-12 w-12 text-muted-foreground" />;
     }
-    return <FileVideo className="h-12 w-12 text-muted-foreground" />
-  }
+    return <FileVideo className="h-12 w-12 text-muted-foreground" />;
+  };
 
   // Get duration string
   const getDuration = () => {
     if (isVideoMetadata(media.metadata) || isAudioMetadata(media.metadata)) {
-      const duration = media.metadata.duration
-      const minutes = Math.floor(duration / 60)
-      const seconds = Math.floor(duration % 60)
-      return `${minutes}:${seconds.toString().padStart(2, '0')}`
+      const duration = media.metadata.duration;
+      const minutes = Math.floor(duration / 60);
+      const seconds = Math.floor(duration % 60);
+      return `${minutes}:${seconds.toString().padStart(2, "0")}`;
     }
-    return null
-  }
+    return null;
+  };
 
   // Get dimensions string
   const getDimensions = () => {
     if (isVideoMetadata(media.metadata) || isImageMetadata(media.metadata)) {
-      return `${media.metadata.width}x${media.metadata.height}`
+      return `${media.metadata.width}x${media.metadata.height}`;
     }
-    return null
-  }
+    return null;
+  };
 
   // Handle add to timeline
   const handleAddToTimeline = async (e: React.MouseEvent) => {
-    e.stopPropagation()
+    e.stopPropagation();
 
-    setIsAdding(true)
+    setIsAdding(true);
     try {
       // createEffectFromMediaFile automatically calculates optimal position and track
       const effect = await createEffectFromMediaFile(
         projectId,
         media.id,
         undefined, // Auto-calculate position
-        undefined  // Auto-calculate track
-      )
+        undefined // Auto-calculate track
+      );
 
-      addEffect(effect)
-      toast.success('Added to timeline', {
-        description: media.filename
-      })
+      addEffect(effect);
+      toast.success("タイムラインに追加しました", {
+        description: media.filename,
+      });
     } catch (error) {
-      toast.error('Failed to add to timeline', {
-        description: error instanceof Error ? error.message : 'Unknown error'
-      })
+      toast.error("タイムラインへの追加に失敗しました", {
+        description: error instanceof Error ? error.message : "予期しないエラー",
+      });
     } finally {
-      setIsAdding(false)
+      setIsAdding(false);
     }
-  }
+  };
 
   // Handle delete
   const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation()
+    e.stopPropagation();
 
-    if (!confirm('Are you sure you want to delete this media file?')) {
-      return
+    if (
+      !confirm(
+        "このメディアファイルを削除してもよろしいですか？このメディアを使用しているすべてのタイムラインエフェクトも削除されます。"
+      )
+    ) {
+      return;
     }
 
-    setIsDeleting(true)
+    setIsDeleting(true);
     try {
-      await deleteMedia(media.id)
-      removeMediaFile(media.id)
-      toast.success('Media deleted')
+      // CRITICAL: Remove all effects that reference this media file from timeline store
+      // This must happen BEFORE calling deleteMedia to avoid foreign key constraint errors
+      const { effects, removeEffect } = useTimelineStore.getState();
+      const effectsToRemove = effects.filter((e) => e.media_file_id === media.id);
+
+      console.log(
+        `[MediaCard] Removing ${effectsToRemove.length} effects that reference media ${media.id}`
+      );
+
+      // Remove effects from store first
+      effectsToRemove.forEach((effect) => {
+        removeEffect(effect.id);
+      });
+
+      // Now delete from database (this will cascade delete effects)
+      await deleteMedia(media.id);
+
+      // Remove from media store
+      removeMediaFile(media.id);
+
+      toast.success("メディアを削除しました", {
+        description:
+          effectsToRemove.length > 0
+            ? `タイムラインから${effectsToRemove.length}個のエフェクトを削除しました`
+            : undefined,
+      });
     } catch (error) {
-      toast.error('Failed to delete media', {
-        description: error instanceof Error ? error.message : 'Unknown error'
-      })
+      toast.error("メディアの削除に失敗しました", {
+        description: error instanceof Error ? error.message : "予期しないエラー",
+      });
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
-  }
+  };
 
   // Handle click to select
   const handleClick = () => {
-    toggleMediaSelection(media.id)
-  }
+    toggleMediaSelection(media.id);
+  };
 
   // Format file size
   const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   return (
     <Card
       className={`
         media-card p-4 cursor-pointer hover:bg-accent transition-colors
-        ${isSelected ? 'ring-2 ring-primary' : ''}
+        ${isSelected ? "ring-2 ring-primary" : ""}
       `}
       onClick={handleClick}
     >
@@ -146,9 +173,7 @@ export function MediaCard({ media, projectId }: MediaCardProps) {
             <span>{formatFileSize(media.file_size)}</span>
             {getDuration() && <span>{getDuration()}</span>}
           </div>
-          {getDimensions() && (
-            <p className="text-xs text-muted-foreground">{getDimensions()}</p>
-          )}
+          {getDimensions() && <p className="text-xs text-muted-foreground">{getDimensions()}</p>}
         </div>
 
         {/* Actions */}
@@ -161,7 +186,7 @@ export function MediaCard({ media, projectId }: MediaCardProps) {
             disabled={isAdding}
           >
             <Plus className="h-4 w-4 mr-1" />
-            {isAdding ? 'Adding...' : 'Add'}
+            {isAdding ? "追加中..." : "追加"}
           </Button>
 
           <Button
@@ -176,5 +201,5 @@ export function MediaCard({ media, projectId }: MediaCardProps) {
         </div>
       </div>
     </Card>
-  )
+  );
 }

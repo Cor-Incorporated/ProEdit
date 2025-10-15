@@ -24,9 +24,12 @@ export class Compositor {
   private timecode = 0
   private animationFrameId: number | null = null
 
+  // Cleanup guard to prevent double-destroy in React Strict Mode
+  private isDestroyed = false
+
   // FIXED: Store all effects for playback loop access
   private allEffects: Effect[] = []
-  
+
   // Track visible effect IDs to detect changes
   private visibleEffectIds = new Set<string>()
 
@@ -79,18 +82,26 @@ export class Compositor {
   /**
    * Set effects for playback
    * FIXED: Store effects internally so playback loop can access them
+   * OPTIMIZED: Don't immediately recompose - let playback loop handle it
+   * This prevents infinite loops when effects are updated frequently (e.g., auto-save)
    */
   setEffects(effects: Effect[]): void {
     this.allEffects = effects
-    // Immediately check if recompose is needed
-    void this.recomposeIfNeeded()
+    // Don't immediately recompose - the playback loop will handle it on next frame
+    // If paused, caller should explicitly call seek() or composeEffects()
   }
 
   /**
    * Recompose only if visible effects changed
    * FIXED: Performance optimization - only recompose when necessary
+   * GUARD: Prevent execution after destroy
    */
   private async recomposeIfNeeded(): Promise<void> {
+    // Guard: Don't execute if compositor is destroyed
+    if (this.isDestroyed) {
+      return
+    }
+
     try {
       // Get effects visible at current timecode
       const visibleEffects = this.getEffectsRelativeToTimecode(
@@ -179,6 +190,11 @@ export class Compositor {
    * Ported from omniclip:203-227
    */
   async seek(timecode: number, effects?: Effect[]): Promise<void> {
+    // Guard: Check if destroyed
+    if (this.isDestroyed || !this.app) {
+      return
+    }
+
     this.timecode = timecode
 
     if (effects) {
@@ -199,8 +215,14 @@ export class Compositor {
       this.onTimecodeChange(timecode)
     }
 
-    // Render frame
-    this.app.render()
+    // Render frame - with null check
+    if (this.app && this.app.renderer && !this.isDestroyed) {
+      try {
+        this.app.render()
+      } catch (error) {
+        logger.error('Compositor: Render failed during seek', error)
+      }
+    }
   }
 
   /**
@@ -209,7 +231,7 @@ export class Compositor {
    * FIXED: Recompose effects every frame to update visibility based on timecode
    */
   private startPlaybackLoop = (): void => {
-    if (!this.isPlaying) return
+    if (!this.isPlaying || this.isDestroyed) return
 
     // Calculate elapsed time (omniclip:150-155)
     const now = performance.now() - this.pauseTime
@@ -223,6 +245,16 @@ export class Compositor {
     // Prevents unnecessary composeEffects calls (60fps → ~2-5fps)
     if (this.allEffects.length > 0) {
       void this.recomposeIfNeeded()
+    }
+
+    // CRITICAL: Update video textures for smooth playback
+    // PIXI.js video textures need manual update in some cases
+    if (this.app && this.app.renderer && !this.isDestroyed) {
+      try {
+        this.app.render()
+      } catch {
+        // Ignore render errors during cleanup
+      }
     }
 
     // Notify timecode change
@@ -240,8 +272,15 @@ export class Compositor {
   /**
    * Compose effects at current timecode
    * Ported from omniclip:157-162
+   * GUARD: Prevent execution after destroy
    */
   async composeEffects(effects: Effect[], timecode: number): Promise<void> {
+    // Guard: Don't execute if compositor is destroyed or app is invalid
+    if (this.isDestroyed || !this.app || !this.app.stage || !this.app.renderer) {
+      logger.warn('Compositor: Cannot compose - app is destroyed or invalid')
+      return
+    }
+
     this.timecode = timecode
 
     // Get effects that should be visible at this timecode
@@ -250,8 +289,14 @@ export class Compositor {
     // Update currently played effects
     await this.updateCurrentlyPlayedEffects(visibleEffects, timecode)
 
-    // Render frame
-    this.app.render()
+    // Render frame - with final null check
+    if (this.app && this.app.renderer && !this.isDestroyed) {
+      try {
+        this.app.render()
+      } catch (error) {
+        logger.error('Compositor: Render failed', error)
+      }
+    }
   }
 
   /**
@@ -269,17 +314,34 @@ export class Compositor {
   /**
    * Update currently played effects
    * Ported from omniclip:177-185
+   * GUARD: Prevent execution after destroy
+   * OPTIMIZED: Only add/remove effects that actually changed
    */
   private async updateCurrentlyPlayedEffects(
     newEffects: Effect[],
     timecode: number
   ): Promise<void> {
+    // Guard: Don't execute if compositor is destroyed or stage is null
+    if (this.isDestroyed || !this.app.stage) {
+      return
+    }
+
     const currentIds = new Set(this.currentlyPlayedEffects.keys())
     const newIds = new Set(newEffects.map((e) => e.id))
 
     // Find effects to add and remove
     const toAdd = newEffects.filter((e) => !currentIds.has(e.id))
     const toRemove = Array.from(currentIds).filter((id) => !newIds.has(id))
+
+    // CRITICAL: Only process if there are actual changes
+    // Skip if nothing to add or remove
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      // No changes - skip processing to avoid unnecessary operations
+      logger.debug('Compositor: No effect changes, skipping update')
+      return
+    }
+
+    logger.debug(`Compositor: Updating effects - adding ${toAdd.length}, removing ${toRemove.length}`)
 
     // Remove old effects
     for (const id of toRemove) {
@@ -299,22 +361,42 @@ export class Compositor {
 
     // Add new effects
     for (const effect of toAdd) {
-      // Ensure media is loaded
+      // Guard: Check if destroyed during async operations
+      if (this.isDestroyed) {
+        return
+      }
+
+      // Ensure media is loaded and add to stage ONLY if not already added
       if (isVideoEffect(effect)) {
+        // Only load video if not already ready
         if (!this.videoManager.isReady(effect.id)) {
           await this.videoManager.addVideo(effect)
         }
+        
+        // Seek to correct position
         await this.videoManager.seek(effect.id, effect, timecode)
-        this.videoManager.addToStage(effect.id, effect.track, 3) // 3 tracks default
+        
+        // Add to stage ONLY if not already on stage
+        const sprite = this.videoManager.getSprite(effect.id)
+        if (sprite && !sprite.parent) {
+          this.videoManager.addToStage(effect.id, effect.track, 3)
+        }
 
+        // Play if compositor is playing
         if (this.isPlaying) {
           await this.videoManager.play(effect.id)
         }
       } else if (isImageEffect(effect)) {
+        // Only add image if not already loaded
         if (!this.imageManager.getSprite(effect.id)) {
           await this.imageManager.addImage(effect)
         }
-        this.imageManager.addToStage(effect.id, effect.track, 3)
+        
+        // Add to stage ONLY if not already on stage
+        const sprite = this.imageManager.getSprite(effect.id)
+        if (sprite && !sprite.parent) {
+          this.imageManager.addToStage(effect.id, effect.track, 3)
+        }
       } else if (isAudioEffect(effect)) {
         // Audio doesn't have visual representation
         if (this.isPlaying) {
@@ -322,17 +404,27 @@ export class Compositor {
         }
       } else if (isTextEffect(effect)) {
         // Text overlay - Phase 7 T079
+        // Only add text if not already added
         if (!this.textManager.has(effect.id)) {
           await this.textManager.add_text_effect(effect, false)
         }
-        this.textManager.add_text_to_canvas(effect)
+        
+        // Add to canvas ONLY if not already on canvas
+        const textData = this.textManager.get(effect.id)
+        const textSprite = textData?.sprite
+        if (textSprite && !textSprite.parent) {
+          this.textManager.add_text_to_canvas(effect)
+        }
       }
 
       this.currentlyPlayedEffects.set(effect.id, effect)
     }
 
-    // Sort children by z-index
-    this.app.stage.sortChildren()
+    // Guard: Check stage again before sorting (async operations may have destroyed it)
+    if (!this.isDestroyed && this.app.stage) {
+      // Sort children by z-index
+      this.app.stage.sortChildren()
+    }
   }
 
   /**
@@ -397,8 +489,16 @@ export class Compositor {
    * Destroy compositor
    * P0-FIX: Proper cleanup to prevent memory leaks
    * CR-FIX: Enhanced cleanup with explicit resource disposal
+   * STRICT-MODE-FIX: Guard against double-destroy in React Strict Mode
    */
   destroy(): void {
+    // Guard: Prevent double-destroy (React Strict Mode issue)
+    if (this.isDestroyed) {
+      logger.warn('Compositor: Already destroyed, skipping cleanup')
+      return
+    }
+
+    this.isDestroyed = true
     this.pause()
 
     // Stop animation frame if running
@@ -428,18 +528,18 @@ export class Compositor {
     this.audioManager.destroy()
     this.textManager.clear()
 
-    // CR-FIX: Clear all stage children before destroying app
-    this.app.stage.removeChildren()
-
-    // Destroy PIXI application with full cleanup
-    // PIXI v7: app.destroy() automatically handles stage cleanup
-    // DO NOT call stage.destroy() separately - it causes cancelResize errors
+    // IMPORTANT: Following omniclip pattern - DO NOT call app.destroy()
+    // omniclip/s/context/controllers/compositor/controller.ts:136-141
+    // Only clears renderer and removes children - never destroys the app
+    // Canvas component owns the app lifecycle and will destroy it
     try {
-      this.app.destroy(true, {
-        children: true,
-        texture: true,
-      })
-      logger.info('Compositor: Cleaned up all resources (enhanced memory leak prevention)')
+      if (this.app.renderer) {
+        this.app.renderer.clear()
+      }
+      if (this.app.stage) {
+        this.app.stage.removeChildren()
+      }
+      logger.info('Compositor: Cleaned up all resources (omniclip pattern - no app.destroy)')
     } catch (error) {
       logger.error('Compositor: Error during cleanup', error)
     }

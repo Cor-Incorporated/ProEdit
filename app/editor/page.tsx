@@ -17,11 +17,11 @@ export default async function EditorDashboardPage() {
     <div className="container mx-auto p-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">My Projects</h1>
+          <h1 className="text-3xl font-bold">マイプロジェクト</h1>
           <p className="text-muted-foreground mt-1">
             {projects.length === 0
-              ? "Create your first video project to get started"
-              : `${projects.length} project${projects.length === 1 ? "" : "s"}`}
+              ? "最初のビデオプロジェクトを作成して開始しましょう"
+              : `${projects.length}件のプロジェクト`}
           </p>
         </div>
         <NewProjectDialog />
@@ -45,10 +45,9 @@ export default async function EditorDashboardPage() {
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold">No projects yet</h2>
+            <h2 className="text-xl font-semibold">プロジェクトがありません</h2>
             <p className="text-muted-foreground max-w-md">
-              Get started by creating your first video project. You can add media, create timelines,
-              and export professional videos.
+              最初のビデオプロジェクトを作成して始めましょう。メディアを追加したり、タイムラインを作成したり、プロフェッショナルなビデオをエクスポートできます。
             </p>
             <div className="pt-4">
               <NewProjectDialog />

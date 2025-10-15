@@ -1,46 +1,46 @@
-'use client'
+"use client";
 
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { MediaUpload } from './MediaUpload'
-import { MediaCard } from './MediaCard'
-import { useMediaStore } from '@/stores/media'
-import { useEffect } from 'react'
-import { getMediaFiles } from '@/app/actions/media'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { MediaUpload } from "./MediaUpload";
+import { MediaCard } from "./MediaCard";
+import { useMediaStore } from "@/stores/media";
+import { useEffect } from "react";
+import { getMediaFiles } from "@/app/actions/media";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MediaLibraryProps {
-  projectId: string
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  projectId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function MediaLibrary({ projectId, open, onOpenChange }: MediaLibraryProps) {
-  const { mediaFiles, isLoading, setMediaFiles, setLoading } = useMediaStore()
+  const { mediaFiles, isLoading, setMediaFiles, setLoading } = useMediaStore();
 
   // Load media files when opened
   useEffect(() => {
     if (open && mediaFiles.length === 0) {
-      loadMediaFiles()
+      loadMediaFiles();
     }
-  }, [open])
+  }, [open]);
 
   const loadMediaFiles = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const files = await getMediaFiles()
-      setMediaFiles(files)
+      const files = await getMediaFiles();
+      setMediaFiles(files);
     } catch (error) {
-      console.error('Failed to load media files:', error)
+      console.error("Failed to load media files:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-96 overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Media Library</SheetTitle>
+          <SheetTitle>メディアライブラリ</SheetTitle>
         </SheetHeader>
 
         <div className="mt-6 space-y-4">
@@ -56,12 +56,12 @@ export function MediaLibrary({ projectId, open, onOpenChange }: MediaLibraryProp
             </div>
           ) : mediaFiles.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <p>No media files yet</p>
-              <p className="text-sm mt-2">Drag and drop files to upload</p>
+              <p>メディアファイルがありません</p>
+              <p className="text-sm mt-2">ファイルをドラッグ＆ドロップしてアップロード</p>
             </div>
           ) : (
             <div className="media-browser">
-              {mediaFiles.map(media => (
+              {mediaFiles.map((media) => (
                 <MediaCard key={media.id} media={media} projectId={projectId} />
               ))}
             </div>
@@ -69,5 +69,5 @@ export function MediaLibrary({ projectId, open, onOpenChange }: MediaLibraryProp
         </div>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

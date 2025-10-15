@@ -1,8 +1,9 @@
 // Ported from omniclip: vendor/omniclip/s/context/controllers/video-export/helpers/FFmpegHelper/helper.ts (Line 12-96)
+// Modified for Next.js: toBlobURL removed (Webpack compatibility)
 
+import { AudioEffect, Effect, VideoEffect } from '@/types/effects'
 import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { toBlobURL, fetchFile } from '@ffmpeg/util'
-import { Effect, AudioEffect, VideoEffect } from '@/types/effects'
+import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 export type ProgressCallback = (progress: number) => void
 
@@ -20,27 +21,74 @@ export class FFmpegHelper {
     this.setupProgressHandler()
   }
 
-  // Ported from omniclip Line 24-30
+  // Modified from omniclip Line 24-30
+  // Next.js adaptation: Direct URLs with fallback to blob URLs
+  // Service Worker (coi-serviceworker) provides SharedArrayBuffer support
   async load(): Promise<void> {
     if (this.isLoaded) return
 
     try {
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.5/dist/esm'
+      // Check SharedArrayBuffer availability first
+      if (typeof SharedArrayBuffer === 'undefined') {
+        throw new Error(
+          'SharedArrayBuffer is not available. ' +
+          'Make sure Service Worker (coi-serviceworker.js) is registered and page is reloaded. ' +
+          'Check browser console for COOP/COEP header warnings.'
+        )
+      }
+
+      console.log('[FFmpeg] SharedArrayBuffer is available ✓')
+      console.log('[FFmpeg] Cross-origin isolated:', crossOriginIsolated)
+
+      // Use local files from public directory
+      // Next.js serves files from /public at the root URL
+      const baseURL = typeof window !== 'undefined' 
+        ? `${window.location.origin}/ffmpeg`
+        : '/ffmpeg'
+
+      // Try direct URLs first (faster, no blob conversion needed)
+      // This works with Service Worker providing COOP/COEP headers
+      console.log('[FFmpeg] Loading from:', baseURL)
+      
+      // Use full URLs for better compatibility
       await this.ffmpeg.load({
-        coreURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          'text/javascript'
-        ),
-        wasmURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
-          'application/wasm'
-        ),
+        coreURL: `${baseURL}/ffmpeg-core.js`,
+        wasmURL: `${baseURL}/ffmpeg-core.wasm`,
       })
+
       this.isLoaded = true
-      console.log('FFmpeg loaded successfully')
+      console.log('[FFmpeg] Loaded successfully from local files')
     } catch (error) {
-      console.error('Failed to load FFmpeg:', error)
-      throw new Error('Failed to load FFmpeg')
+      console.error('[FFmpeg] Load failed:', error)
+
+      // Fallback: Load from CDN using blob URLs (works without /public/ffmpeg)
+      try {
+        const cdnBase = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm'
+        console.log('[FFmpeg] Falling back to CDN:', cdnBase)
+
+        await this.ffmpeg.load({
+          coreURL: await toBlobURL(`${cdnBase}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${cdnBase}/ffmpeg-core.wasm`, 'application/wasm'),
+        })
+
+        this.isLoaded = true
+        console.log('[FFmpeg] Loaded successfully from CDN fallback')
+        return
+      } catch (fallbackError) {
+        const errorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+        let helpText = 'Troubleshooting:\n'
+
+        if (typeof SharedArrayBuffer === 'undefined') {
+          helpText += '1. Service Worker is not running - reload the page\n'
+          helpText += '2. Check that /coi-serviceworker.js is accessible\n'
+        } else {
+          helpText += '1. Check that /public/ffmpeg/ contains ffmpeg-core.js and ffmpeg-core.wasm\n'
+          helpText += '2. Run "npm run setup:ffmpeg" to download FFmpeg files\n'
+          helpText += '3. Ensure these files are committed for Vercel deployment or rely on CDN fallback\n'
+        }
+
+        throw new Error(`Failed to load FFmpeg (CDN fallback): ${errorMessage}\n\n${helpText}`)
+      }
     }
   }
 
