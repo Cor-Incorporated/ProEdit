@@ -59,10 +59,8 @@ export function RegisterServiceWorker() {
       }
     }
 
-    // Register after a short delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      void registerSW()
-    }, 100)
+    // Register ASAP; avoid不要な遅延でCOOP/COEP前のリクエストを発生させない
+    const timer = setTimeout(() => { void registerSW() }, 0)
 
     return () => clearTimeout(timer)
   }, [])
