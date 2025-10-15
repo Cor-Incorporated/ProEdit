@@ -18,6 +18,7 @@ export class VideoManager {
   >()
   // Prevent concurrent duplicate addVideo calls (race guard)
   private inFlightAdds = new Set<string>()
+  private failedAttempts = new Map<string, number>()
 
   constructor(
     private app: PIXI.Application,
@@ -40,6 +41,12 @@ export class VideoManager {
       return
     }
 
+    const attempts = this.failedAttempts.get(effect.id) || 0
+    if (attempts >= 2) {
+      logger.warn(`VideoManager: Skipping addVideo for ${effect.id} after ${attempts} failed attempts`)
+      return
+    }
+
     try {
       this.inFlightAdds.add(effect.id)
       // Get video file URL from storage
@@ -48,7 +55,7 @@ export class VideoManager {
       // Create video element (omniclip:55-57)
       const element = document.createElement('video')
       element.src = fileUrl
-      element.preload = 'auto'
+      element.preload = 'metadata'
       element.crossOrigin = 'anonymous'
       element.width = effect.properties.rect.width
       element.height = effect.properties.rect.height
@@ -74,7 +81,7 @@ export class VideoManager {
       sprite.cursor = 'pointer'
 
       // Wait for video metadata to load with explicit listener cleanup
-      await new Promise<void>((resolve, reject) => {
+      const waitForMetadata = () => new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           cleanup()
           reject(new Error('Video metadata load timeout'))
@@ -105,12 +112,31 @@ export class VideoManager {
         element.load()
       })
 
+      try {
+        await waitForMetadata()
+      } catch (firstError) {
+        // Fallback: fetch as blob and set object URL to bypass CORS peculiarities
+        try {
+          logger.warn(`VideoManager: Metadata failed for ${effect.id}, trying blob fallback`)
+          const res = await fetch(fileUrl, { cache: 'no-store' })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const blob = await res.blob()
+          const objectUrl = URL.createObjectURL(blob)
+          element.src = objectUrl
+          await waitForMetadata()
+        } catch {
+          throw firstError instanceof Error ? firstError : new Error(String(firstError))
+        }
+      }
+
       // Store reference
       this.videos.set(effect.id, { sprite, element, texture })
 
       logger.info(`VideoManager: Added video effect ${effect.id}`)
+      this.failedAttempts.delete(effect.id)
     } catch (error) {
       logger.error(`VideoManager: Failed to add video ${effect.id}:`, error)
+      this.failedAttempts.set(effect.id, (this.failedAttempts.get(effect.id) || 0) + 1)
       throw error
     } finally {
       this.inFlightAdds.delete(effect.id)
