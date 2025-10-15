@@ -99,6 +99,7 @@ export class Compositor {
   private async recomposeIfNeeded(): Promise<void> {
     // Guard: Don't execute if compositor is destroyed
     if (this.isDestroyed) {
+      logger.warn('Compositor.recomposeIfNeeded: Compositor is destroyed, skipping')
       return
     }
 
@@ -112,7 +113,11 @@ export class Compositor {
 
       // Only recompose if the set of visible effects changed
       if (!this.setsEqual(this.visibleEffectIds, newIds)) {
+        // Guard before async compose
+        if (this.isDestroyed) return
         await this.composeEffects(this.allEffects, this.timecode)
+        // Guard after async compose
+        if (this.isDestroyed) return
         this.visibleEffectIds = newIds
       }
     } catch (error) {

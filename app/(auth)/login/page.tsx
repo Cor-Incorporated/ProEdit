@@ -110,6 +110,8 @@ export default function LoginPage() {
       } else {
         setError(null);
         // 確認ページに誘導
+        // Supabase側でもパスワードポリシーが適用されます（サーバ側で検証）
+        // クライアント側のバリデーションは回避可能なため、必ずサーバの結果を確認してください。
         router.push("/auth/verify-email");
         setIsLoading(false);
       }

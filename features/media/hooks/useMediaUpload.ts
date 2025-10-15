@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { uploadMediaMetadata } from '@/app/actions/media'
 import { calculateFileHash } from '../utils/hash'
 import { extractMetadata } from '../utils/metadata'
@@ -27,6 +27,8 @@ export function useMediaUpload(projectId: string) {
    * @param files Array of files to upload
    * @returns Promise<MediaFile[]> Uploaded or existing files
    */
+  const timeoutRef = useRef<number | null>(null)
+
   const uploadFiles = useCallback(
     async (files: File[]): Promise<MediaFile[]> => {
       setIsUploading(true)
@@ -105,10 +107,11 @@ export function useMediaUpload(projectId: string) {
         setUploadProgress(100)
 
         // Reset after a short delay
-        setTimeout(() => {
+        timeoutRef.current = window.setTimeout(() => {
           setIsUploading(false)
           setProgress(0)
           setUploadProgress(0)
+          timeoutRef.current = null
         }, 500)
 
         return uploadedFiles
@@ -134,6 +137,16 @@ export function useMediaUpload(projectId: string) {
     },
     [uploadFiles]
   )
+
+  // Avoid memory leaks: clear pending timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [])
 
   return {
     uploadFiles,
