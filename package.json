@@ -11,7 +11,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "setup:ffmpeg": "bash scripts/setup-ffmpeg.sh"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -41,6 +42,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "coi-serviceworker": "^0.1.7",
     "lucide-react": "^0.545.0",
     "next": "15.5.5",
     "next-themes": "^0.4.6",

@@ -22,8 +22,15 @@ export class ImageManager {
   /**
    * Add image effect to canvas
    * Ported from omniclip:45-80
+   * GUARD: Prevent duplicate additions
    */
   async addImage(effect: ImageEffect): Promise<void> {
+    // CRITICAL: Check if already added to prevent duplicates
+    if (this.images.has(effect.id)) {
+      console.warn(`ImageManager: Image ${effect.id} already added, skipping`)
+      return
+    }
+
     try {
       const fileUrl = await this.getMediaFileUrl(effect.media_file_id)
 

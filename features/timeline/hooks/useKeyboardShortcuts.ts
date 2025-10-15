@@ -5,18 +5,18 @@
 
 'use client'
 
-import { useEffect } from 'react'
-import { useTimelineStore } from '@/stores/timeline'
-import { useHistoryStore } from '@/stores/history'
 import { useCompositorStore } from '@/stores/compositor'
+import { useHistoryStore } from '@/stores/history'
+import { useTimelineStore } from '@/stores/timeline'
+import { useEffect } from 'react'
 
 export function useKeyboardShortcuts() {
   const { effects, restoreSnapshot, currentTime } = useTimelineStore()
   const { undo, redo, canUndo, canRedo } = useHistoryStore()
-  const { timecode, setTimecode, togglePlayPause } = useCompositorStore()
+  const { timecode, seek: seekStore, togglePlayPause, play, pause } = useCompositorStore()
 
-  // Seek function
-  const seek = (time: number) => setTimecode(time)
+  // Seek function -> Compositor 実体へ伝播
+  const seek = (time: number) => seekStore(time)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,6 +60,27 @@ export function useKeyboardShortcuts() {
         e.preventDefault()
         togglePlayPause()
         console.log('Keyboard: Toggle play/pause')
+        return
+      }
+
+      // JKL like NLE: J=back 1s, K=pause, L=play
+      if (e.key.toLowerCase() === 'j') {
+        e.preventDefault()
+        const newTime = Math.max(0, (timecode || currentTime) - 1000)
+        seek(newTime)
+        console.log('Keyboard: J (back 1s)')
+        return
+      }
+      if (e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        pause()
+        console.log('Keyboard: K (pause)')
+        return
+      }
+      if (e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        play()
+        console.log('Keyboard: L (play)')
         return
       }
 
@@ -149,7 +170,7 @@ export function useKeyboardShortcuts() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [effects, timecode, currentTime, undo, redo, canUndo, canRedo, restoreSnapshot, togglePlayPause, seek])
+  }, [effects, timecode, currentTime, undo, redo, canUndo, canRedo, restoreSnapshot, togglePlayPause, seek, seekStore])
 
   // Return nothing - this is a pure side-effect hook
   return null

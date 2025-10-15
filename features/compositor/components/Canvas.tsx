@@ -14,11 +14,15 @@ interface CanvasProps {
 export function Canvas({ width, height, onAppReady }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const appRef = useRef<PIXI.Application | null>(null)
+  const isDestroyedRef = useRef(false)
   const [isReady, setIsReady] = useState(false)
   const { setCanvasReady } = useCompositorStore()
 
   useEffect(() => {
     if (!containerRef.current || appRef.current) return
+
+    // Reset destroy flag for new mount
+    isDestroyedRef.current = false
 
     // Initialize PIXI Application (from omniclip:37) - v7 API
     try {
@@ -62,12 +66,40 @@ export function Canvas({ width, height, onAppReady }: CanvasProps) {
       })
     }
 
-    // Cleanup
+    // Cleanup - MUST destroy PIXI app to prevent WebGL context leak
+    // React lifecycle requires proper resource cleanup
     return () => {
+      // Prevent double-destroy (React Strict Mode issue)
+      if (isDestroyedRef.current) {
+        console.warn('Canvas: Already destroyed, skipping double-destroy')
+        return
+      }
+
       if (appRef.current) {
-        appRef.current.destroy(true, { children: true })
-        appRef.current = null
-        setCanvasReady(false)
+        isDestroyedRef.current = true
+
+        try {
+          // Clear stage first to prevent errors
+          if (appRef.current.stage) {
+            appRef.current.stage.removeChildren()
+          }
+
+          // IMPORTANT: We MUST call destroy() to release WebGL context
+          // Without this, WebGL contexts accumulate causing:
+          // "WARNING: Too many active WebGL contexts"
+          appRef.current.destroy(true, {
+            children: true,
+            texture: true,
+          })
+
+          console.log('Canvas: PIXI app destroyed successfully')
+        } catch (error) {
+          console.error('Canvas: Error during PIXI destroy', error)
+        } finally {
+          appRef.current = null
+          setIsReady(false)
+          setCanvasReady(false)
+        }
       }
     }
   }, [width, height, onAppReady, setCanvasReady])

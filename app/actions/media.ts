@@ -5,10 +5,78 @@ import { uploadMediaFile, deleteMediaFile } from '@/lib/supabase/utils'
 import { revalidatePath } from 'next/cache'
 import { MediaFile } from '@/types/media'
 
-// Security: Maximum file size (500MB)
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB in bytes
+// Security: Maximum file size (2GB - aligned with Supabase storage limit)
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
 
 /**
+ * Save media file metadata to database with hash-based deduplication
+ * Client-side upload to Supabase Storage should be done before calling this
+ * Returns existing file if hash matches (FR-012 compliance)
+ * @param params Media file metadata
+ * @returns Promise<MediaFile> The created or existing media file record
+ */
+export async function uploadMediaMetadata(params: {
+  fileHash: string
+  filename: string
+  fileSize: number
+  mimeType: string
+  storagePath: string
+  metadata: Record<string, unknown>
+}): Promise<MediaFile> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Security: Validate file size
+  if (params.fileSize > MAX_FILE_SIZE) {
+    throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`)
+  }
+
+  // Security: Validate file size is positive
+  if (params.fileSize <= 0) {
+    throw new Error('Invalid file size')
+  }
+
+  // CRITICAL: Hash-based deduplication check (FR-012)
+  // If file with same hash exists for this user, reuse it
+  const { data: existing } = await supabase
+    .from('media_files')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('file_hash', params.fileHash)
+    .single()
+
+  if (existing) {
+    console.log('File already exists (hash match), reusing:', existing.id)
+    return existing as MediaFile
+  }
+
+  // New file - insert metadata into database
+  const { data, error } = await supabase
+    .from('media_files')
+    .insert({
+      user_id: user.id,
+      file_hash: params.fileHash,
+      filename: params.filename,
+      file_size: params.fileSize,
+      mime_type: params.mimeType,
+      storage_path: params.storagePath,
+      metadata: params.metadata as unknown as Record<string, unknown>,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Insert media error:', error)
+    throw new Error(error.message)
+  }
+
+  return data as MediaFile
+}
+
+/**
+ * @deprecated Use uploadMediaMetadata instead. This function is kept for backward compatibility.
  * Upload media file with hash-based deduplication
  * Returns existing file if hash matches (FR-012 compliance)
  * @param projectId Project ID (for storage organization)
@@ -30,7 +98,7 @@ export async function uploadMedia(
 
   // Security: Validate file size before upload
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024)}MB`)
+    throw new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / (1024 * 1024 * 1024)}GB`)
   }
 
   // Security: Validate file size is positive
@@ -154,10 +222,19 @@ export async function deleteMedia(mediaId: string): Promise<void> {
 
   if (!media) throw new Error('Media not found')
 
-  // Delete from storage
-  await deleteMediaFile(media.storage_path)
+  // Delete from database first (DB state remains consistent even if storage deletion fails)
+  // 1) Delete effects referencing this media (FK consistency)
+  const { error: effectsError } = await supabase
+    .from('effects')
+    .delete()
+    .eq('media_file_id', mediaId)
 
-  // Delete from database (cascades to effects via FK)
+  if (effectsError) {
+    console.error('Failed to delete associated effects:', effectsError)
+    throw new Error(`Failed to delete associated effects: ${effectsError.message}`)
+  }
+
+  // 2) Delete media DB row
   const { error } = await supabase
     .from('media_files')
     .delete()
@@ -167,6 +244,13 @@ export async function deleteMedia(mediaId: string): Promise<void> {
   if (error) {
     console.error('Delete media error:', error)
     throw new Error(error.message)
+  }
+
+  // 3) Delete from storage (best-effort)
+  try {
+    await deleteMediaFile(media.storage_path)
+  } catch (storageError) {
+    console.warn('Storage deletion failed after DB cleanup:', storageError)
   }
 
   revalidatePath('/editor')

@@ -5,6 +5,7 @@ import { AudioProperties, Effect, TextProperties, VideoImageProperties } from '@
 import { revalidatePath } from 'next/cache'
 // P0-3 FIX: Add input validation
 import { EffectBaseSchema, validateEffectProperties, validatePartialEffectProperties } from '@/lib/validation/effect-schemas'
+import { ensureInteger } from '@/lib/utils/database'
 
 /**
  * Create a new effect on the timeline
@@ -52,10 +53,10 @@ export async function createEffect(
       project_id: projectId,
       kind: validatedBase.kind,
       track: validatedBase.track,
-      start_at_position: validatedBase.start_at_position,
-      duration: validatedBase.duration,
-      start: validatedBase.start, // Trim start (omniclip)
-      end: validatedBase.end, // Trim end (omniclip)
+      start_at_position: ensureInteger(validatedBase.start_at_position)!,
+      duration: ensureInteger(validatedBase.duration)!,
+      start: ensureInteger(validatedBase.start)!, // Trim start (omniclip)
+      end: ensureInteger(validatedBase.end)!, // Trim end (omniclip)
       media_file_id: validatedBase.media_file_id,
       properties: validatedProperties as Record<string, unknown>,
       // Add metadata fields
@@ -166,6 +167,21 @@ export async function updateEffect(
       ...updates,
       properties: validatedProperties as VideoImageProperties | AudioProperties | TextProperties,
     };
+  }
+
+  // FIX: Ensure INTEGER fields are rounded (database schema requires integers)
+  // Float values from calculations must be converted to integers
+  if (validatedUpdates.start_at_position !== undefined) {
+    validatedUpdates.start_at_position = ensureInteger(validatedUpdates.start_at_position)!;
+  }
+  if (validatedUpdates.duration !== undefined) {
+    validatedUpdates.duration = ensureInteger(validatedUpdates.duration)!;
+  }
+  if (validatedUpdates.start !== undefined) {
+    validatedUpdates.start = ensureInteger(validatedUpdates.start)!;
+  }
+  if (validatedUpdates.end !== undefined) {
+    validatedUpdates.end = ensureInteger(validatedUpdates.end)!;
   }
 
   // Update effect
@@ -320,7 +336,7 @@ export async function createEffectFromMediaFile(
 
   // 5. Get metadata
   const metadata = mediaFile.metadata as Record<string, unknown>
-  const rawDuration = ((metadata.duration as number | undefined) || 5) * 1000 // Default 5s for images
+  const rawDuration = Math.round(((metadata.duration as number | undefined) || 5) * 1000) // Default 5s for images, must be integer
 
   // 6. Calculate optimal position and track if not provided
   const { findPlaceForNewEffect } = await import('@/features/timeline/utils/placement')
@@ -337,7 +353,7 @@ export async function createEffectFromMediaFile(
   const effectData = {
     kind,
     track,
-    start_at_position: position,
+    start_at_position: Math.round(position), // Must be integer
     duration: rawDuration,
     start: 0, // Trim start (omniclip)
     end: rawDuration, // Trim end (omniclip)
@@ -386,14 +402,14 @@ function createDefaultProperties(
           y: height / 2
         }
       },
-      raw_duration: ((metadata.duration as number | undefined) || 5) * 1000,
+      raw_duration: Math.round(((metadata.duration as number | undefined) || 5) * 1000), // Must be integer
       frames: (metadata.frames as number | undefined) || Math.floor(((metadata.duration as number | undefined) || 5) * ((metadata.fps as number | undefined) || 30))
     }
   } else if (kind === 'audio') {
     return {
       volume: 1.0,
       muted: false,
-      raw_duration: ((metadata.duration as number | undefined) || 0) * 1000
+      raw_duration: Math.round(((metadata.duration as number | undefined) || 0) * 1000) // Must be integer
     }
   }
 

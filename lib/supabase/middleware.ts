@@ -34,12 +34,21 @@ export async function updateSession(request: NextRequest) {
   // Refresh session if expired
   await supabase.auth.getUser();
 
-  // Protected routes logic can be added here
-  // if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/login'
-  //   return NextResponse.redirect(url)
-  // }
+  // Protected routes: require session for /editor and /app routes
+  const pathname = request.nextUrl.pathname
+  const isPublicPath =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname === '/' ||
+    pathname.startsWith('/api')
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!isPublicPath && !user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(url)
+  }
 
   return supabaseResponse;
 }

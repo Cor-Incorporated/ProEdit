@@ -29,7 +29,7 @@ export function NewProjectDialog() {
     e.preventDefault();
 
     if (!name.trim()) {
-      setError("Project name is required");
+      setError("プロジェクト名を入力してください");
       return;
     }
 
@@ -43,7 +43,7 @@ export function NewProjectDialog() {
       setName("");
       router.push(`/editor/${project.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
+      setError(err instanceof Error ? err.message : "プロジェクトの作成に失敗しました");
     } finally {
       setIsLoading(false);
     }
@@ -64,14 +64,14 @@ export function NewProjectDialog() {
       <DialogTrigger asChild>
         <Button size="lg" className="gap-2">
           <Plus className="h-5 w-5" />
-          New Project
+          新規プロジェクト
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>Enter a name for your new video project</DialogDescription>
+            <DialogTitle>新規プロジェクトを作成</DialogTitle>
+            <DialogDescription>新しいビデオプロジェクトの名前を入力してください</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {error && (
@@ -81,10 +81,10 @@ export function NewProjectDialog() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="name">Project Name</Label>
+              <Label htmlFor="name">プロジェクト名</Label>
               <Input
                 id="name"
-                placeholder="My Awesome Video"
+                placeholder="私の素晴らしいビデオ"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={isLoading}
@@ -99,10 +99,10 @@ export function NewProjectDialog() {
               onClick={() => handleOpenChange(false)}
               disabled={isLoading}
             >
-              Cancel
+              キャンセル
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Creating..." : "Create Project"}
+              {isLoading ? "作成中..." : "プロジェクトを作成"}
             </Button>
           </DialogFooter>
         </form>

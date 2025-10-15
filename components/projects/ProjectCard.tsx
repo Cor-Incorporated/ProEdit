@@ -45,10 +45,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
     try {
       setIsDeleting(true);
       await deleteProject(project.id);
-      toast.success("Project deleted successfully");
+      toast.success("プロジェクトを削除しました");
       setShowDeleteDialog(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete project");
+      toast.error(err instanceof Error ? err.message : "プロジェクトの削除に失敗しました");
     } finally {
       setIsDeleting(false);
     }
@@ -62,12 +62,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    if (diffMins < 1) return "たった今";
+    if (diffMins < 60) return `${diffMins}分前`;
+    if (diffHours < 24) return `${diffHours}時間前`;
+    if (diffDays < 7) return `${diffDays}日前`;
 
-    return date.toLocaleDateString();
+    return date.toLocaleDateString("ja-JP");
   };
 
   return (
@@ -104,7 +104,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   }}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  削除
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -117,7 +117,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Last edited {formatDate(project.updated_at)}
+            最終更新: {formatDate(project.updated_at)}
           </p>
         </CardFooter>
       </Card>
@@ -125,20 +125,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent onClick={(e) => e.stopPropagation()}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogTitle>プロジェクトを削除</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{project.name}&quot;? This action cannot be
-              undone.
+              本当に「{project.name}」を削除しますか？この操作は元に戻せません。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>キャンセル</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? "削除中..." : "削除"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

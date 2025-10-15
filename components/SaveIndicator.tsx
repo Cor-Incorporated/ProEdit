@@ -15,45 +15,37 @@ interface SaveIndicatorProps {
   className?: string;
 }
 
-export function SaveIndicator({
-  status,
-  lastSaved,
-  className,
-}: SaveIndicatorProps) {
+export function SaveIndicator({ status, lastSaved, className }: SaveIndicatorProps) {
   const getStatusDisplay = () => {
     switch (status) {
       case "saved":
         return {
           icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-          text: "Saved",
-          subtext: lastSaved
-            ? `Last saved ${formatRelativeTime(lastSaved)}`
-            : undefined,
+          text: "保存済み",
+          subtext: lastSaved ? `最終保存: ${formatRelativeTime(lastSaved)}` : undefined,
           className: "text-green-500",
         };
 
       case "saving":
         return {
-          icon: (
-            <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-          ),
-          text: "Saving...",
+          icon: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
+          text: "保存中...",
           className: "text-blue-500",
         };
 
       case "error":
         return {
           icon: <AlertCircle className="h-4 w-4 text-red-500" />,
-          text: "Save failed",
-          subtext: "Click to retry",
+          text: "保存失敗",
+          subtext: "クリックして再試行",
           className: "text-red-500",
         };
 
       case "offline":
         return {
           icon: <WifiOff className="h-4 w-4 text-amber-500" />,
-          text: "Offline",
-          subtext: "Changes will sync when online",
+          text: "オフライン",
+          subtext: "オンライン時に同期されます",
           className: "text-amber-500",
         };
     }
@@ -62,22 +54,13 @@ export function SaveIndicator({
   const display = getStatusDisplay();
 
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 text-sm transition-opacity",
-        className
-      )}
-    >
+    <div className={cn("flex items-center gap-2 text-sm transition-opacity", className)}>
       <div className="flex items-center gap-1.5">
         {display.icon}
-        <span className={cn("font-medium", display.className)}>
-          {display.text}
-        </span>
+        <span className={cn("font-medium", display.className)}>{display.text}</span>
       </div>
 
-      {display.subtext && (
-        <span className="text-xs text-muted-foreground">{display.subtext}</span>
-      )}
+      {display.subtext && <span className="text-xs text-muted-foreground">{display.subtext}</span>}
     </div>
   );
 }
@@ -90,18 +73,17 @@ function formatRelativeTime(date: Date): string {
   const diffMs = now.getTime() - date.getTime();
   const diffSec = Math.floor(diffMs / 1000);
 
-  if (diffSec < 10) return "just now";
-  if (diffSec < 60) return `${diffSec} seconds ago`;
+  if (diffSec < 10) return "たった今";
+  if (diffSec < 60) return `${diffSec}秒前`;
 
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? "s" : ""} ago`;
+  if (diffMin < 60) return `${diffMin}分前`;
 
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24)
-    return `${diffHour} hour${diffHour > 1 ? "s" : ""} ago`;
+  if (diffHour < 24) return `${diffHour}時間前`;
 
   const diffDay = Math.floor(diffHour / 24);
-  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+  return `${diffDay}日前`;
 }
 
 /**
@@ -150,12 +132,12 @@ export function SaveIndicatorCompact({
 function getStatusTitle(status: SaveStatus): string {
   switch (status) {
     case "saved":
-      return "All changes saved";
+      return "すべての変更を保存しました";
     case "saving":
-      return "Saving changes...";
+      return "変更を保存中...";
     case "error":
-      return "Save failed - click to retry";
+      return "保存失敗 - クリックして再試行";
     case "offline":
-      return "Offline - changes will sync when connection is restored";
+      return "オフライン - 接続が復元されたら同期されます";
   }
 }

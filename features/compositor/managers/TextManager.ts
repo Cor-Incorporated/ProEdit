@@ -86,8 +86,15 @@ export class TextManager extends Map<
   /**
    * Create and add text effect
    * Port from omniclip Line 77-118
+   * GUARD: Prevent duplicate additions
    */
   async add_text_effect(effect: TextEffect, recreate = false): Promise<void> {
+    // CRITICAL: Check if already added to prevent duplicates
+    if (this.has(effect.id) && !recreate) {
+      console.warn(`TextManager: Text ${effect.id} already added, skipping`)
+      return
+    }
+
     const { rect, ...props } = effect.properties
 
     const style = new PIXI.TextStyle({

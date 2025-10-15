@@ -1,7 +1,7 @@
+import { AutoSaveManager, SaveStatus } from '@/features/timeline/utils/autosave'
+import { Effect } from '@/types/effects'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import { Effect } from '@/types/effects'
-import { AutoSaveManager, SaveStatus } from '@/features/timeline/utils/autosave'
 
 // Global AutoSaveManager instance
 let autoSaveManagerInstance: AutoSaveManager | null = null
@@ -15,6 +15,8 @@ export interface TimelineStore {
   zoom: number // pixels per second
   trackCount: number
   selectedEffectIds: string[]
+  markers: { id: string; time: number; label?: string; color?: string }[]
+  lockedTracks: number[] // track indexes that are locked
 
   // Phase 6: Editing state
   isDragging: boolean
@@ -36,6 +38,14 @@ export interface TimelineStore {
   setTrackCount: (count: number) => void
   toggleEffectSelection: (id: string) => void
   clearSelection: () => void
+
+  // Markers
+  addMarker: (time: number, label?: string, color?: string) => void
+  removeMarker: (id: string) => void
+  updateMarker: (id: string, updates: Partial<{ time: number; label?: string; color?: string }>) => void
+
+  // Track lock
+  toggleTrackLock: (trackIndex: number) => void
 
   // Phase 6: Editing actions
   setDragging: (isDragging: boolean, effectId?: string) => void
@@ -59,6 +69,8 @@ export const useTimelineStore = create<TimelineStore>()(
       zoom: 100, // 100px = 1 second
       trackCount: 3,
       selectedEffectIds: [],
+      markers: [],
+      lockedTracks: [],
 
       // Phase 6: Editing state
       isDragging: false,
@@ -115,6 +127,29 @@ export const useTimelineStore = create<TimelineStore>()(
       })),
 
       clearSelection: () => set({ selectedEffectIds: [] }),
+
+      // Markers
+      addMarker: (time, label, color) => set((state) => ({
+        markers: [
+          ...state.markers,
+          { id: crypto.randomUUID(), time: Math.max(0, Math.round(time)), label, color },
+        ],
+      })),
+
+      removeMarker: (id) => set((state) => ({
+        markers: state.markers.filter(m => m.id !== id),
+      })),
+
+      updateMarker: (id, updates) => set((state) => ({
+        markers: state.markers.map(m => m.id === id ? { ...m, ...('time' in updates && updates.time !== undefined ? { time: Math.max(0, Math.round(updates.time)) } : {}), ...(updates.label !== undefined ? { label: updates.label } : {}), ...(updates.color !== undefined ? { color: updates.color } : {}) } : m),
+      })),
+
+      // Track lock
+      toggleTrackLock: (trackIndex) => set((state) => ({
+        lockedTracks: state.lockedTracks.includes(trackIndex)
+          ? state.lockedTracks.filter(t => t !== trackIndex)
+          : [...state.lockedTracks, trackIndex],
+      })),
 
       // Phase 6: Editing actions
       setDragging: (isDragging, effectId) => set({
