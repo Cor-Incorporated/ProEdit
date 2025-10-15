@@ -5,6 +5,7 @@ import { AudioProperties, Effect, TextProperties, VideoImageProperties } from '@
 import { revalidatePath } from 'next/cache'
 // P0-3 FIX: Add input validation
 import { EffectBaseSchema, validateEffectProperties, validatePartialEffectProperties } from '@/lib/validation/effect-schemas'
+import { ensureInteger } from '@/lib/utils/database'
 
 /**
  * Create a new effect on the timeline
@@ -52,10 +53,10 @@ export async function createEffect(
       project_id: projectId,
       kind: validatedBase.kind,
       track: validatedBase.track,
-      start_at_position: validatedBase.start_at_position,
-      duration: validatedBase.duration,
-      start: validatedBase.start, // Trim start (omniclip)
-      end: validatedBase.end, // Trim end (omniclip)
+      start_at_position: ensureInteger(validatedBase.start_at_position)!,
+      duration: ensureInteger(validatedBase.duration)!,
+      start: ensureInteger(validatedBase.start)!, // Trim start (omniclip)
+      end: ensureInteger(validatedBase.end)!, // Trim end (omniclip)
       media_file_id: validatedBase.media_file_id,
       properties: validatedProperties as Record<string, unknown>,
       // Add metadata fields
@@ -171,16 +172,16 @@ export async function updateEffect(
   // FIX: Ensure INTEGER fields are rounded (database schema requires integers)
   // Float values from calculations must be converted to integers
   if (validatedUpdates.start_at_position !== undefined) {
-    validatedUpdates.start_at_position = Math.round(validatedUpdates.start_at_position);
+    validatedUpdates.start_at_position = ensureInteger(validatedUpdates.start_at_position)!;
   }
   if (validatedUpdates.duration !== undefined) {
-    validatedUpdates.duration = Math.round(validatedUpdates.duration);
+    validatedUpdates.duration = ensureInteger(validatedUpdates.duration)!;
   }
   if (validatedUpdates.start !== undefined) {
-    validatedUpdates.start = Math.round(validatedUpdates.start);
+    validatedUpdates.start = ensureInteger(validatedUpdates.start)!;
   }
   if (validatedUpdates.end !== undefined) {
-    validatedUpdates.end = Math.round(validatedUpdates.end);
+    validatedUpdates.end = ensureInteger(validatedUpdates.end)!;
   }
 
   // Update effect

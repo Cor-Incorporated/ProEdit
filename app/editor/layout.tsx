@@ -1,17 +1,16 @@
-import { ReactNode } from "react";
-import Link from "next/link";
-import { Toaster } from "@/components/ui/sonner";
+import { getUser, signOut } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Toaster } from "@/components/ui/sonner";
 import { Home, LogOut, User } from "lucide-react";
-import { getUser } from "@/app/actions/auth";
-import { signOut } from "@/app/actions/auth";
+import Link from "next/link";
+import { ReactNode } from "react";
 
 /**
  * Editor layout

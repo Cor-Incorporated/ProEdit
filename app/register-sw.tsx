@@ -42,8 +42,6 @@ export function RegisterServiceWorker() {
           console.log('[SW] Service Worker is active')
         } else {
           console.log('[SW] Waiting for Service Worker to activate...')
-          
-          // Reload page once Service Worker is active to enable SharedArrayBuffer
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing
             if (newWorker) {
@@ -71,5 +69,24 @@ export function RegisterServiceWorker() {
 
   // No UI, just registration logic
   return null
+}
+
+/**
+ * Wait for Service Worker to be ready and controller to be active.
+ * Call this before initializing FFmpeg to reduce load failures.
+ */
+export async function waitForServiceWorker(): Promise<void> {
+  if (typeof window === 'undefined') return
+  if (!('serviceWorker' in navigator)) return
+  const registration = await navigator.serviceWorker.ready
+  if (!navigator.serviceWorker.controller) {
+    await new Promise<void>((resolve) => {
+      const onChange = () => {
+        navigator.serviceWorker.removeEventListener('controllerchange', onChange)
+        resolve()
+      }
+      navigator.serviceWorker.addEventListener('controllerchange', onChange, { once: true })
+    })
+  }
 }
 
