@@ -1,5 +1,6 @@
 import { VideoEffect } from '@/types/effects'
 import * as PIXI from 'pixi.js'
+import { logger } from '@/lib/utils/logger'
 
 /**
  * VideoManager - Manages video effects on PIXI canvas
@@ -31,11 +32,11 @@ export class VideoManager {
   async addVideo(effect: VideoEffect): Promise<void> {
     // CRITICAL: Check if already added to prevent duplicates
     if (this.videos.has(effect.id)) {
-      console.warn(`VideoManager: Video ${effect.id} already added, skipping`)
+      logger.warn(`VideoManager: Video ${effect.id} already added, skipping`)
       return
     }
     if (this.inFlightAdds.has(effect.id)) {
-      console.debug(`VideoManager: addVideo already in-flight for ${effect.id}, skipping duplicate call`)
+      logger.debug(`VideoManager: addVideo in-flight for ${effect.id}, skipping duplicate call`)
       return
     }
 
@@ -72,22 +73,34 @@ export class VideoManager {
       sprite.eventMode = 'static'
       sprite.cursor = 'pointer'
 
-      // Wait for video metadata to load
+      // Wait for video metadata to load with explicit listener cleanup
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
+          cleanup()
           reject(new Error('Video metadata load timeout'))
-        }, 5000) // 5 second timeout
+        }, 5000)
 
-        element.addEventListener('loadedmetadata', () => {
+        const onLoaded = () => {
           clearTimeout(timeout)
+          cleanup()
           resolve()
-        }, { once: true })
+        }
 
-        element.addEventListener('error', (e) => {
+        const onError = (e: Event) => {
           clearTimeout(timeout)
-          reject(new Error(`Video load error: ${e.message || 'Unknown error'}`))
-        }, { once: true })
+          cleanup()
+          const maybeMessage = (e as unknown as { message?: string })
+          const msg = maybeMessage && maybeMessage.message ? maybeMessage.message : 'Unknown error'
+          reject(new Error(`Video load error: ${msg}`))
+        }
 
+        const cleanup = () => {
+          element.removeEventListener('loadedmetadata', onLoaded)
+          element.removeEventListener('error', onError)
+        }
+
+        element.addEventListener('loadedmetadata', onLoaded)
+        element.addEventListener('error', onError)
         // Trigger load
         element.load()
       })
@@ -95,9 +108,9 @@ export class VideoManager {
       // Store reference
       this.videos.set(effect.id, { sprite, element, texture })
 
-      console.log(`VideoManager: Added video effect ${effect.id}`)
+      logger.info(`VideoManager: Added video effect ${effect.id}`)
     } catch (error) {
-      console.error(`VideoManager: Failed to add video ${effect.id}:`, error)
+      logger.error(`VideoManager: Failed to add video ${effect.id}:`, error)
       throw error
     } finally {
       this.inFlightAdds.delete(effect.id)
@@ -116,9 +129,7 @@ export class VideoManager {
     video.sprite.zIndex = trackCount - track
 
     this.app.stage.addChild(video.sprite)
-    console.log(
-      `VideoManager: Added to stage ${effectId} (track ${track}, zIndex ${video.sprite.zIndex})`
-    )
+    logger.debug(`VideoManager: Added to stage ${effectId} (track ${track}, zIndex ${video.sprite.zIndex})`)
   }
 
   /**
@@ -129,7 +140,7 @@ export class VideoManager {
     if (!video) return
 
     this.app.stage.removeChild(video.sprite)
-    console.log(`VideoManager: Removed from stage ${effectId}`)
+    logger.debug(`VideoManager: Removed from stage ${effectId}`)
   }
 
   /**
@@ -168,21 +179,19 @@ export class VideoManager {
 
     // Check if video is ready to play
     if (!this.isVideoElementReady(effectId)) {
-      console.debug(`VideoManager: Video ${effectId} not ready yet, skipping play`)
+      logger.debug(`VideoManager: Video ${effectId} not ready yet, skipping play`)
       return
     }
 
     if (video.element.paused) {
       try {
         await video.element.play()
-        console.debug(`VideoManager: Playing ${effectId}`)
+        logger.debug(`VideoManager: Playing ${effectId}`)
       } catch (error) {
-        // Autoplay failed - this is expected on first load without user interaction
-        // The video will play once the user interacts with the page (e.g., clicks play button)
         if (error instanceof Error && error.name === 'NotAllowedError') {
-          console.debug(`VideoManager: Autoplay blocked for ${effectId} - waiting for user interaction`)
+          logger.debug(`VideoManager: Autoplay blocked for ${effectId} - waiting for user interaction`)
         } else {
-          console.warn(`VideoManager: Play failed for ${effectId}:`, error)
+          logger.warn(`VideoManager: Play failed for ${effectId}:`, error)
         }
       }
     }
@@ -231,7 +240,7 @@ export class VideoManager {
     video.texture.destroy(true)
 
     this.videos.delete(effectId)
-    console.log(`VideoManager: Removed video ${effectId}`)
+    logger.debug(`VideoManager: Removed video ${effectId}`)
   }
 
   /**
@@ -243,7 +252,7 @@ export class VideoManager {
       try {
         this.remove(id)
       } catch (error) {
-        console.warn(`VideoManager: Error removing video ${id}:`, error)
+        logger.warn(`VideoManager: Error removing video ${id}:`, error)
       }
     })
     this.videos.clear()
@@ -259,7 +268,7 @@ export class VideoManager {
         try {
           this.remove(id)
         } catch (error) {
-          console.warn(`VideoManager: prune failed for ${id}:`, error)
+          logger.warn(`VideoManager: prune failed for ${id}:`, error)
         }
       }
     }
