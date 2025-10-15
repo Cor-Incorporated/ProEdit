@@ -55,17 +55,17 @@ export function PlaybackControls({
   }
 
   return (
-    <div className="playback-controls flex items-center gap-2 px-4 py-2 bg-muted/50 border-t border-border">
+    <div className="playback-controls flex items-center gap-2 px-4 py-2 bg-background border-t border-border">
       {/* Transport controls */}
       <div className="flex items-center gap-1">
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={handleSeekBackward}
           disabled={timecode === 0}
           title="1秒戻る (←)"
         >
-          <SkipBack className="h-4 w-4" />
+          <SkipBack className="h-4 w-4 text-foreground" />
         </Button>
 
         <Button
@@ -74,36 +74,36 @@ export function PlaybackControls({
           onClick={handlePlayPause}
           title={isPlaying ? '一時停止 (Space)' : '再生 (Space)'}
         >
-          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {isPlaying ? <Pause className="h-4 w-4 text-background" /> : <Play className="h-4 w-4 text-background" />}
         </Button>
 
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={() => { stop(); seek(0) }}
           title="停止 / 先頭へ"
         >
-          <Square className="h-4 w-4" />
+          <Square className="h-4 w-4 text-foreground" />
         </Button>
 
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           onClick={handleSeekForward}
           disabled={timecode >= duration}
           title="1秒進む (→)"
         >
-          <SkipForward className="h-4 w-4" />
+          <SkipForward className="h-4 w-4 text-foreground" />
         </Button>
       </div>
 
       {/* Timecode display */}
       <div className="flex items-center gap-2 ml-4">
-        <div className="text-sm font-mono text-muted-foreground">
+        <div className="text-sm font-mono text-foreground">
           {formatTimecode(timecode)}
         </div>
-        <span className="text-muted-foreground">/</span>
-        <div className="text-sm font-mono text-muted-foreground">
+        <span className="text-foreground">/</span>
+        <div className="text-sm font-mono text-foreground">
           {formatTimecode(duration)}
         </div>
       </div>
