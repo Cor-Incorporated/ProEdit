@@ -44,6 +44,7 @@ export function EditorClient({ project }: EditorClientProps) {
   const compositorRef = useRef<Compositor | null>(null)
   // Phase 9: Realtime sync state (AutoSave managed by Zustand)
   const syncManagerRef = useRef<RealtimeSyncManager | null>(null)
+  const exportPollRef = useRef<NodeJS.Timeout | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [conflict, setConflict] = useState<ConflictData | null>(null)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
@@ -216,6 +217,28 @@ export function EditorClient({ project }: EditorClientProps) {
     }
   }, [effectIds, effects]) // Only trigger when effectIds change
 
+  const mapJobStatusToProgress = (status: string): 'preparing' | 'encoding' | 'flushing' | 'complete' | 'error' => {
+    switch (status) {
+      case 'pending':
+        return 'preparing'
+      case 'processing':
+        return 'encoding'
+      case 'completed':
+        return 'complete'
+      case 'failed':
+        return 'error'
+      default:
+        return 'preparing'
+    }
+  }
+
+  const clearExportPoll = () => {
+    if (exportPollRef.current) {
+      clearInterval(exportPollRef.current)
+      exportPollRef.current = null
+    }
+  }
+
   // Handle export with progress callback
   const handleExport = async (
     quality: ExportQuality,
@@ -236,9 +259,11 @@ export function EditorClient({ project }: EditorClientProps) {
       throw new Error('No effects to export')
     }
 
+    clearExportPoll()
+
     onProgress({
       status: 'preparing',
-      progress: 10,
+      progress: 5,
       currentFrame: 0,
       totalFrames: 0,
     })
@@ -265,48 +290,88 @@ export function EditorClient({ project }: EditorClientProps) {
         throw new Error(message)
       }
 
-      onProgress({
-        status: 'encoding',
-        progress: 60,
-        currentFrame: 0,
-        totalFrames: 0,
-      })
-
-      if (!payload?.downloadUrl) {
-        throw new Error('エクスポート済みファイルのURLを取得できませんでした')
+      const jobId = payload?.jobId as string | undefined
+      if (!jobId) {
+        throw new Error('エクスポートジョブIDの取得に失敗しました')
       }
 
-      const downloadResponse = await fetch(payload.downloadUrl)
-      if (!downloadResponse.ok) {
-        throw new Error('エクスポート済みファイルの取得に失敗しました')
-      }
+      await new Promise<void>((resolve, reject) => {
+        const pollJobStatus = async () => {
+          try {
+            const statusResponse = await fetch(`/api/render/${jobId}`)
+            const jobPayload = await statusResponse.json().catch(() => ({}))
 
-      onProgress({
-        status: 'flushing',
-        progress: 90,
-        currentFrame: 0,
-        totalFrames: 0,
+            if (!statusResponse.ok) {
+              const message =
+                typeof jobPayload?.error === 'string'
+                  ? jobPayload.error
+                  : `ジョブステータスの取得に失敗しました (HTTP ${statusResponse.status})`
+              throw new Error(message)
+            }
+
+            const jobStatus = String(jobPayload.status ?? 'pending')
+            const mappedStatus = mapJobStatusToProgress(jobStatus)
+            const jobProgress = typeof jobPayload.progress === 'number' ? jobPayload.progress : 0
+
+            onProgress({
+              status: mappedStatus,
+              progress: jobProgress,
+              currentFrame: 0,
+              totalFrames: 0,
+            })
+
+            if (jobStatus === 'completed' && jobPayload.downloadUrl) {
+              clearExportPoll()
+
+              const downloadResponse = await fetch(jobPayload.downloadUrl)
+              if (!downloadResponse.ok) {
+                throw new Error('エクスポート済みファイルの取得に失敗しました')
+              }
+
+              const arrayBuffer = await downloadResponse.arrayBuffer()
+              const data = new Uint8Array(arrayBuffer)
+              const filename =
+                typeof jobPayload.filename === 'string'
+                  ? jobPayload.filename
+                  : `export_${quality}_${Date.now()}.mp4`
+
+              downloadFile(data, filename)
+
+              onProgress({
+                status: 'complete',
+                progress: 100,
+                currentFrame: 0,
+                totalFrames: 0,
+              })
+
+              toast.success('エクスポートが完了しました！')
+              resolve()
+              return
+            }
+
+            if (jobStatus === 'failed') {
+              clearExportPoll()
+              const errorMessage =
+                typeof jobPayload.error_message === 'string' && jobPayload.error_message.length > 0
+                  ? jobPayload.error_message
+                  : 'サーバーエクスポートに失敗しました'
+              throw new Error(errorMessage)
+            }
+          } catch (error) {
+            clearExportPoll()
+            reject(error)
+          }
+        }
+
+        // Initial poll
+        void pollJobStatus()
+        exportPollRef.current = setInterval(() => {
+          void pollJobStatus()
+        }, 2000)
       })
-
-      const arrayBuffer = await downloadResponse.arrayBuffer()
-      const data = new Uint8Array(arrayBuffer)
-      const filename =
-        typeof payload.filename === 'string'
-          ? payload.filename
-          : `export_${quality}_${Date.now()}.mp4`
-
-      downloadFile(data, filename)
-
-      onProgress({
-        status: 'complete',
-        progress: 100,
-        currentFrame: 0,
-        totalFrames: 0,
-      })
-
-      toast.success('エクスポートが完了しました！')
     } catch (error) {
       console.error('Export error:', error)
+      clearExportPoll()
       onProgress({
         status: 'error',
         progress: 0,
@@ -328,7 +393,12 @@ export function EditorClient({ project }: EditorClientProps) {
         compositorRef.current.destroy()
         compositorRef.current = null
       }
-      
+
+      if (exportPollRef.current) {
+        clearInterval(exportPollRef.current)
+        exportPollRef.current = null
+      }
+
       // Canvas cleanup (app.destroy) will happen automatically in Canvas component
     }
   }, [])
