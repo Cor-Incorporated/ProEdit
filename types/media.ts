@@ -39,6 +39,10 @@ export interface MediaFile {
   mime_type: string;
   storage_path: string;
   metadata: MediaMetadata;
+  proxy_path: string | null;
+  proxy_status: "pending" | "processing" | "ready" | "failed";
+  proxy_generated_at: string | null;
+  proxy_last_error: string | null;
   created_at: string;
 }
 

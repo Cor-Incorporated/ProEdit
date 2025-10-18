@@ -1,7 +1,7 @@
 'use client'
 
 import { createTextEffect, updateTextEffectStyle } from '@/app/actions/effects'
-import { getMediaFileByHash, getSignedUrl } from '@/app/actions/media'
+import { getSignedUrl } from '@/app/actions/media'
 import { Button } from '@/components/ui/button'
 import { Canvas } from '@/features/compositor/components/Canvas'
 import { FPSCounter } from '@/features/compositor/components/FPSCounter'
@@ -11,8 +11,6 @@ import { TextEditor } from '@/features/effects/components/TextEditor'
 import { ExportDialog } from '@/features/export/components/ExportDialog'
 import { ExportQuality } from '@/features/export/types'
 import { downloadFile } from '@/features/export/utils/download'
-// Dynamic import for ExportController (FFmpeg.wasm compatibility)
-import type { ExportController } from '@/features/export/utils/ExportController'
 import { MediaLibrary } from '@/features/media/components/MediaLibrary'
 import { Timeline } from '@/features/timeline/components/Timeline'
 import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
@@ -44,7 +42,6 @@ export function EditorClient({ project }: EditorClientProps) {
   const [selectedTextEffect, setSelectedTextEffect] = useState<TextEffect | null>(null)
 
   const compositorRef = useRef<Compositor | null>(null)
-  const exportControllerRef = useRef<ExportController | null>(null)
   // Phase 9: Realtime sync state (AutoSave managed by Zustand)
   const syncManagerRef = useRef<RealtimeSyncManager | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
@@ -124,7 +121,7 @@ export function EditorClient({ project }: EditorClientProps) {
     const compositor = new Compositor(
       app,
       async (mediaFileId: string) => {
-        const url = await getSignedUrl(mediaFileId)
+        const url = await getSignedUrl(mediaFileId, { preferProxy: true })
         return url
       },
       project.settings.fps,
@@ -239,41 +236,83 @@ export function EditorClient({ project }: EditorClientProps) {
       throw new Error('No effects to export')
     }
 
+    onProgress({
+      status: 'preparing',
+      progress: 10,
+      currentFrame: 0,
+      totalFrames: 0,
+    })
+
     try {
-      // Dynamically import ExportController (FFmpeg.wasm compatibility)
-      if (!exportControllerRef.current) {
-        const { ExportController: ExportControllerClass } = await import('@/features/export/utils/ExportController')
-        exportControllerRef.current = new ExportControllerClass()
-      }
-
-      const controller = exportControllerRef.current
-
-      // Connect progress callback from ExportController to ExportDialog
-      controller.onProgress(onProgress)
-
-      // Define renderFrame callback using Compositor.renderFrameForExport
-      const renderFrame = async (timestamp: number) => {
-        return await compositorRef.current!.renderFrameForExport(timestamp, effects)
-      }
-
-      // Start export
-      const result = await controller.startExport(
-        {
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           projectId: project.id,
           quality,
-          includeAudio: true, // Default to include audio
-        },
-        effects,
-        getMediaFileByHash,
-        renderFrame
-      )
+        }),
+      })
 
-      // Download exported file
-      downloadFile(result.file, result.filename)
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        const message =
+          typeof payload?.error === 'string'
+            ? payload.error
+            : `サーバーエクスポートに失敗しました (HTTP ${response.status})`
+        throw new Error(message)
+      }
+
+      onProgress({
+        status: 'encoding',
+        progress: 60,
+        currentFrame: 0,
+        totalFrames: 0,
+      })
+
+      if (!payload?.downloadUrl) {
+        throw new Error('エクスポート済みファイルのURLを取得できませんでした')
+      }
+
+      const downloadResponse = await fetch(payload.downloadUrl)
+      if (!downloadResponse.ok) {
+        throw new Error('エクスポート済みファイルの取得に失敗しました')
+      }
+
+      onProgress({
+        status: 'flushing',
+        progress: 90,
+        currentFrame: 0,
+        totalFrames: 0,
+      })
+
+      const arrayBuffer = await downloadResponse.arrayBuffer()
+      const data = new Uint8Array(arrayBuffer)
+      const filename =
+        typeof payload.filename === 'string'
+          ? payload.filename
+          : `export_${quality}_${Date.now()}.mp4`
+
+      downloadFile(data, filename)
+
+      onProgress({
+        status: 'complete',
+        progress: 100,
+        currentFrame: 0,
+        totalFrames: 0,
+      })
 
       toast.success('エクスポートが完了しました！')
     } catch (error) {
       console.error('Export error:', error)
+      onProgress({
+        status: 'error',
+        progress: 0,
+        currentFrame: 0,
+        totalFrames: 0,
+      })
       toast.error(`エクスポートに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
       throw error
     }
@@ -288,12 +327,6 @@ export function EditorClient({ project }: EditorClientProps) {
       if (compositorRef.current) {
         compositorRef.current.destroy()
         compositorRef.current = null
-      }
-      
-      // Destroy ExportController
-      if (exportControllerRef.current) {
-        exportControllerRef.current.terminate()
-        exportControllerRef.current = null
       }
       
       // Canvas cleanup (app.destroy) will happen automatically in Canvas component
