@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { uploadMediaFile, deleteMediaFile } from '@/lib/supabase/utils'
 import { revalidatePath } from 'next/cache'
 import { MediaFile } from '@/types/media'
+import { generateProxyForMedia } from '@/lib/media/proxy'
 
 // Security: Maximum file size (2GB - aligned with Supabase storage limit)
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB in bytes
@@ -49,6 +50,11 @@ export async function uploadMediaMetadata(params: {
 
   if (existing) {
     console.log('File already exists (hash match), reusing:', existing.id)
+    if (existing.proxy_status !== 'ready' || !existing.proxy_path) {
+      void generateProxyForMedia(existing.id).catch((proxyError) => {
+        console.error('Proxy regeneration failed:', proxyError)
+      })
+    }
     return existing as MediaFile
   }
 
@@ -71,6 +77,11 @@ export async function uploadMediaMetadata(params: {
     console.error('Insert media error:', error)
     throw new Error(error.message)
   }
+
+  // Trigger proxy generation in background (fire-and-forget)
+  void generateProxyForMedia(data.id).catch((proxyError) => {
+    console.error('Proxy generation failed:', proxyError)
+  })
 
   return data as MediaFile
 }
@@ -117,6 +128,11 @@ export async function uploadMedia(
 
   if (existing) {
     console.log('File already exists (hash match), reusing:', existing.id)
+    if (existing.proxy_status !== 'ready' || !existing.proxy_path) {
+      void generateProxyForMedia(existing.id).catch((proxyError) => {
+        console.error('Proxy regeneration failed:', proxyError)
+      })
+    }
     return existing as MediaFile
   }
 
@@ -142,6 +158,10 @@ export async function uploadMedia(
     console.error('Insert media error:', error)
     throw new Error(error.message)
   }
+
+  void generateProxyForMedia(data.id).catch((proxyError) => {
+    console.error('Proxy generation failed:', proxyError)
+  })
 
   revalidatePath(`/editor/${projectId}`)
   return data as MediaFile
@@ -265,15 +285,19 @@ export async function deleteMedia(mediaId: string): Promise<void> {
  */
 export async function getMediaSignedUrl(
   storagePath: string,
-  expiresIn: number = 3600
+  options: {
+    expiresIn?: number
+    bucket?: 'media-files' | 'media-proxies' | 'exports'
+  } = {}
 ): Promise<string> {
   const supabase = await createClient()
+  const { expiresIn = 3600, bucket = 'media-files' } = options
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
   const { data, error } = await supabase.storage
-    .from('media-files')
+    .from(bucket)
     .createSignedUrl(storagePath, expiresIn)
 
   if (error) {
@@ -294,24 +318,46 @@ export async function getMediaSignedUrl(
  * @param mediaFileId Media file ID
  * @returns Promise<string> Signed URL
  */
-export async function getSignedUrl(mediaFileId: string): Promise<string> {
+export async function getSignedUrl(
+  mediaFileId: string,
+  options: { preferProxy?: boolean; expiresIn?: number } = {}
+): Promise<string> {
   const supabase = await createClient()
+  const { preferProxy = true, expiresIn } = options
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
   // Get media file info
-  const { data: media } = await supabase
+  const { data: media, error } = await supabase
     .from('media_files')
-    .select('storage_path')
+    .select('storage_path, proxy_path, proxy_status')
     .eq('id', mediaFileId)
     .eq('user_id', user.id)
     .single()
 
   if (!media) throw new Error('Media not found')
+  if (error) {
+    console.error('Get media file error:', error)
+    throw new Error('Failed to fetch media file')
+  }
+
+  if (preferProxy && media.proxy_status === 'ready' && media.proxy_path) {
+    try {
+      return await getMediaSignedUrl(media.proxy_path, {
+        bucket: 'media-proxies',
+        expiresIn,
+      })
+    } catch (proxyError) {
+      console.warn('Proxy signed URL generation failed, falling back to original:', proxyError)
+    }
+  }
 
   // Get signed URL for the storage path
-  return getMediaSignedUrl(media.storage_path)
+  return getMediaSignedUrl(media.storage_path, {
+    bucket: 'media-files',
+    expiresIn,
+  })
 }
 
 /**
@@ -341,7 +387,9 @@ export async function getMediaFileByHash(fileHash: string): Promise<File> {
   }
 
   // 2. Get signed URL for secure access
-  const signedUrl = await getSignedUrl(media.id)
+  const signedUrl = await getMediaSignedUrl(media.storage_path, {
+    bucket: 'media-files',
+  })
 
   // 3. Fetch file as Blob
   const response = await fetch(signedUrl)

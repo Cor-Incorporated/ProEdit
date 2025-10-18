@@ -1,7 +1,7 @@
 'use client'
 
 import { createTextEffect, updateTextEffectStyle } from '@/app/actions/effects'
-import { getMediaFileByHash, getSignedUrl } from '@/app/actions/media'
+import { getSignedUrl } from '@/app/actions/media'
 import { Button } from '@/components/ui/button'
 import { Canvas } from '@/features/compositor/components/Canvas'
 import { FPSCounter } from '@/features/compositor/components/FPSCounter'
@@ -11,8 +11,6 @@ import { TextEditor } from '@/features/effects/components/TextEditor'
 import { ExportDialog } from '@/features/export/components/ExportDialog'
 import { ExportQuality } from '@/features/export/types'
 import { downloadFile } from '@/features/export/utils/download'
-// Dynamic import for ExportController (FFmpeg.wasm compatibility)
-import type { ExportController } from '@/features/export/utils/ExportController'
 import { MediaLibrary } from '@/features/media/components/MediaLibrary'
 import { Timeline } from '@/features/timeline/components/Timeline'
 import { useKeyboardShortcuts } from '@/features/timeline/hooks/useKeyboardShortcuts'
@@ -44,9 +42,9 @@ export function EditorClient({ project }: EditorClientProps) {
   const [selectedTextEffect, setSelectedTextEffect] = useState<TextEffect | null>(null)
 
   const compositorRef = useRef<Compositor | null>(null)
-  const exportControllerRef = useRef<ExportController | null>(null)
   // Phase 9: Realtime sync state (AutoSave managed by Zustand)
   const syncManagerRef = useRef<RealtimeSyncManager | null>(null)
+  const exportPollRef = useRef<NodeJS.Timeout | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [conflict, setConflict] = useState<ConflictData | null>(null)
   const [showConflictDialog, setShowConflictDialog] = useState(false)
@@ -124,7 +122,7 @@ export function EditorClient({ project }: EditorClientProps) {
     const compositor = new Compositor(
       app,
       async (mediaFileId: string) => {
-        const url = await getSignedUrl(mediaFileId)
+        const url = await getSignedUrl(mediaFileId, { preferProxy: true })
         return url
       },
       project.settings.fps,
@@ -219,6 +217,28 @@ export function EditorClient({ project }: EditorClientProps) {
     }
   }, [effectIds, effects]) // Only trigger when effectIds change
 
+  const mapJobStatusToProgress = (status: string): 'preparing' | 'encoding' | 'flushing' | 'complete' | 'error' => {
+    switch (status) {
+      case 'pending':
+        return 'preparing'
+      case 'processing':
+        return 'encoding'
+      case 'completed':
+        return 'complete'
+      case 'failed':
+        return 'error'
+      default:
+        return 'preparing'
+    }
+  }
+
+  const clearExportPoll = () => {
+    if (exportPollRef.current) {
+      clearInterval(exportPollRef.current)
+      exportPollRef.current = null
+    }
+  }
+
   // Handle export with progress callback
   const handleExport = async (
     quality: ExportQuality,
@@ -239,41 +259,125 @@ export function EditorClient({ project }: EditorClientProps) {
       throw new Error('No effects to export')
     }
 
+    clearExportPoll()
+
+    onProgress({
+      status: 'preparing',
+      progress: 5,
+      currentFrame: 0,
+      totalFrames: 0,
+    })
+
     try {
-      // Dynamically import ExportController (FFmpeg.wasm compatibility)
-      if (!exportControllerRef.current) {
-        const { ExportController: ExportControllerClass } = await import('@/features/export/utils/ExportController')
-        exportControllerRef.current = new ExportControllerClass()
-      }
-
-      const controller = exportControllerRef.current
-
-      // Connect progress callback from ExportController to ExportDialog
-      controller.onProgress(onProgress)
-
-      // Define renderFrame callback using Compositor.renderFrameForExport
-      const renderFrame = async (timestamp: number) => {
-        return await compositorRef.current!.renderFrameForExport(timestamp, effects)
-      }
-
-      // Start export
-      const result = await controller.startExport(
-        {
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           projectId: project.id,
           quality,
-          includeAudio: true, // Default to include audio
-        },
-        effects,
-        getMediaFileByHash,
-        renderFrame
-      )
+        }),
+      })
 
-      // Download exported file
-      downloadFile(result.file, result.filename)
+      const payload = await response.json().catch(() => ({}))
 
-      toast.success('エクスポートが完了しました！')
+      if (!response.ok) {
+        const message =
+          typeof payload?.error === 'string'
+            ? payload.error
+            : `サーバーエクスポートに失敗しました (HTTP ${response.status})`
+        throw new Error(message)
+      }
+
+      const jobId = payload?.jobId as string | undefined
+      if (!jobId) {
+        throw new Error('エクスポートジョブIDの取得に失敗しました')
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const pollJobStatus = async () => {
+          try {
+            const statusResponse = await fetch(`/api/render/${jobId}`)
+            const jobPayload = await statusResponse.json().catch(() => ({}))
+
+            if (!statusResponse.ok) {
+              const message =
+                typeof jobPayload?.error === 'string'
+                  ? jobPayload.error
+                  : `ジョブステータスの取得に失敗しました (HTTP ${statusResponse.status})`
+              throw new Error(message)
+            }
+
+            const jobStatus = String(jobPayload.status ?? 'pending')
+            const mappedStatus = mapJobStatusToProgress(jobStatus)
+            const jobProgress = typeof jobPayload.progress === 'number' ? jobPayload.progress : 0
+
+            onProgress({
+              status: mappedStatus,
+              progress: jobProgress,
+              currentFrame: 0,
+              totalFrames: 0,
+            })
+
+            if (jobStatus === 'completed' && jobPayload.downloadUrl) {
+              clearExportPoll()
+
+              const downloadResponse = await fetch(jobPayload.downloadUrl)
+              if (!downloadResponse.ok) {
+                throw new Error('エクスポート済みファイルの取得に失敗しました')
+              }
+
+              const arrayBuffer = await downloadResponse.arrayBuffer()
+              const data = new Uint8Array(arrayBuffer)
+              const filename =
+                typeof jobPayload.filename === 'string'
+                  ? jobPayload.filename
+                  : `export_${quality}_${Date.now()}.mp4`
+
+              downloadFile(data, filename)
+
+              onProgress({
+                status: 'complete',
+                progress: 100,
+                currentFrame: 0,
+                totalFrames: 0,
+              })
+
+              toast.success('エクスポートが完了しました！')
+              resolve()
+              return
+            }
+
+            if (jobStatus === 'failed') {
+              clearExportPoll()
+              const errorMessage =
+                typeof jobPayload.error_message === 'string' && jobPayload.error_message.length > 0
+                  ? jobPayload.error_message
+                  : 'サーバーエクスポートに失敗しました'
+              throw new Error(errorMessage)
+            }
+          } catch (error) {
+            clearExportPoll()
+            reject(error)
+          }
+        }
+
+        // Initial poll
+        void pollJobStatus()
+        exportPollRef.current = setInterval(() => {
+          void pollJobStatus()
+        }, 2000)
+      })
     } catch (error) {
       console.error('Export error:', error)
+      clearExportPoll()
+      onProgress({
+        status: 'error',
+        progress: 0,
+        currentFrame: 0,
+        totalFrames: 0,
+      })
       toast.error(`エクスポートに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`)
       throw error
     }
@@ -289,13 +393,12 @@ export function EditorClient({ project }: EditorClientProps) {
         compositorRef.current.destroy()
         compositorRef.current = null
       }
-      
-      // Destroy ExportController
-      if (exportControllerRef.current) {
-        exportControllerRef.current.terminate()
-        exportControllerRef.current = null
+
+      if (exportPollRef.current) {
+        clearInterval(exportPollRef.current)
+        exportPollRef.current = null
       }
-      
+
       // Canvas cleanup (app.destroy) will happen automatically in Canvas component
     }
   }, [])
