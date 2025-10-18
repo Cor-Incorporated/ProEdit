@@ -284,9 +284,25 @@ SUPABASE_SERVICE_ROLE_KEY=
 ### TypeScript型安全性
 
 ```
-型カバレッジ: 100%
-any型使用: 意図的な箇所のみ
-型エラー: 0件
+型カバレッジ: プロジェクトコードは100%
+型エラー: 0件（tsc --noEmit）
+```
+
+### ESLint
+
+```bash
+npm run lint
+# 674件（98エラー、576警告）
+# 注: 主にvendor/omniclipディレクトリ（外部コード）
+#     プロジェクトコード（app/, features/, components/）は大部分がクリーン
+```
+
+### ビルド
+
+```bash
+npm run build
+# 成功 ✅
+# 注: 外部リソース（Google Fonts等）取得のためネットワーク接続必要
 ```
 
 ### テスト
@@ -294,7 +310,7 @@ any型使用: 意図的な箇所のみ
 ```
 Unit tests: media.test.ts, timeline.test.ts
 E2E tests: basic.spec.ts
-Integration: Supabase統合テスト
+注: Playwrightによるブラウザテストはローカル環境推奨
 ```
 
 ### パフォーマンス

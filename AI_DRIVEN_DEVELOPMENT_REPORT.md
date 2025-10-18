@@ -397,18 +397,16 @@ ESLint警告: 0件
 ```bash
 # 型チェック
 npx tsc --noEmit
-# 結果: エラー0件
-
-# 型カバレッジ
-grep -r "any" --include="*.ts" --include="*.tsx" src/
-# 結果: 意図的なany使用のみ（外部ライブラリ型定義）
+# 結果: エラー0件（プロジェクトコード）
 ```
 
 ### ESLint
 
 ```bash
 npm run lint
-# 結果: 警告0件
+# 結果: 674件（98エラー、576警告）
+# 注: 主にvendor/omniclipディレクトリ（外部コード）が原因
+#     プロジェクトコード（app/, features/, components/）は大部分がクリーン
 ```
 
 ### ビルド
@@ -416,6 +414,15 @@ npm run lint
 ```bash
 npm run build
 # 結果: 成功 ✅
+# 注: Google Fonts等の外部リソース取得のためネットワーク接続が必要
+```
+
+### テスト
+
+```bash
+npm run test
+# 注: Playwrightによるブラウザ自動テストはローカル環境推奨
+#     Sandbox環境では実行困難な場合があります
 ```
 
 ---
