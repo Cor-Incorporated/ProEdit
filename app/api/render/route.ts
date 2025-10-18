@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ExportQuality } from "@/features/export/types";
 import { processExportJob } from "@/lib/export/server";
 
+export const runtime = "nodejs";
+
 interface RenderRequestPayload {
   projectId?: string;
   quality?: ExportQuality;

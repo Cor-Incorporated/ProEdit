@@ -75,6 +75,30 @@ const nextConfig: NextConfig = {
           },
         ],
       };
+    } else {
+      const externals = config.externals ?? [];
+      if (Array.isArray(externals)) {
+        externals.push('@ffmpeg-installer/ffmpeg', 'fluent-ffmpeg');
+        config.externals = externals;
+      } else if (typeof externals === 'function') {
+        const original = externals;
+        config.externals = (
+          context: unknown,
+          request: string | undefined,
+          callback: (error?: Error | null, result?: string) => void
+        ) => {
+          if (request && ['@ffmpeg-installer/ffmpeg', 'fluent-ffmpeg'].includes(request)) {
+            return callback(null, `commonjs ${request}`);
+          }
+          return original(context, request, callback);
+        };
+      } else {
+        config.externals = {
+          ...externals,
+          '@ffmpeg-installer/ffmpeg': 'commonjs @ffmpeg-installer/ffmpeg',
+          'fluent-ffmpeg': 'commonjs fluent-ffmpeg',
+        };
+      }
     }
     return config;
   },
