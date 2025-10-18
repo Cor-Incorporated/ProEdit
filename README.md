@@ -5,6 +5,9 @@
 **完成度**: 実装93.9%、機能87%
 **品質**: TypeScriptエラー0件、プロダクションビルド成功
 
+> 🎯 **AI駆動開発により21時間8分で41,031行のプロダクションコードを実装。検証可能な実測データに基づく分析。**  
+> 詳細は [AI駆動開発レポート](./AI_DRIVEN_DEVELOPMENT_REPORT.md) を参照
+
 ---
 
 ## 🎉 MVP達成
@@ -342,17 +345,39 @@ Next.js 15をサポートする任意のプラットフォームにデプロイ�
 
 ---
 
+## 📚 ドキュメント
+
+### 開発・運用ドキュメント
+
+- **[DEVELOPMENT_SUMMARY.md](./DEVELOPMENT_SUMMARY.md)** - 開発サマリー、実装状況、アーキテクチャ
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Vercel + Supabaseデプロイ手順
+- **[AI_DRIVEN_DEVELOPMENT_REPORT.md](./AI_DRIVEN_DEVELOPMENT_REPORT.md)** - AI駆動開発の実測データ分析
+
+### ユーザー向けドキュメント
+
+- **[QUICK_START.md](./QUICK_START.md)** - クイックスタートガイド
+- **[USER_GUIDE.md](./USER_GUIDE.md)** - 詳細な使い方
+- **[RELEASE_NOTES.md](./RELEASE_NOTES.md)** - リリースノート
+
+### 技術ドキュメント
+
+- **[docs/](./docs/)** - 詳細な技術ドキュメント
+- **[specs/](./specs/)** - プロジェクト仕様書
+- **各機能README** - `features/*/README.md`に実装詳細
+
+---
+
 ## 📞 サポート
 
 質問、問題、機能リクエストについては:
 
 1. [USER_GUIDE.md](./USER_GUIDE.md)を確認
 2. [トラブルシューティング](#🐛-トラブルシューティング)セクションを確認
-3. `docs/`の既存ドキュメントを確認
+3. 各種ドキュメントを確認
 4. GitHubでissueを開く
 
 ---
 
-**最終更新**: 2025-10-15
-**ステータス**: MVP完成 ✅
+**最終更新**: 2025-10-18  
+**ステータス**: ✅ MVP完成 - デプロイ準備完了  
 **次のマイルストーン**: v1.1 品質改善
