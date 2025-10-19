@@ -18,7 +18,9 @@ interface QueueState {
 
 export const MAX_CONCURRENT_EXPORTS = Number(process.env.EXPORT_MAX_CONCURRENT ?? 2);
 export const MAX_CONCURRENT_EXPORTS_PER_USER = Number(process.env.EXPORT_MAX_PER_USER ?? 1);
-const EXPORT_QUEUE_JOB_TTL_MS = Number(process.env.EXPORT_QUEUE_JOB_TTL_MS ?? 10 * 60 * 1000);
+const rawExportQueueTtl = Number(process.env.EXPORT_QUEUE_JOB_TTL_MS ?? 10 * 60 * 1000);
+const EXPORT_QUEUE_JOB_TTL_MS =
+  Number.isFinite(rawExportQueueTtl) && rawExportQueueTtl > 0 ? rawExportQueueTtl : 10 * 60 * 1000;
 
 type MutableQueueState = QueueState & { initialized?: boolean };
 
@@ -70,18 +72,7 @@ async function runNextJob(state: MutableQueueState): Promise<void> {
           console.error("[ExportQueue] Job failed:", error);
         })
         .finally(() => {
-          const activeIndex = state.active.findIndex((activeJob) => activeJob.jobId === job.jobId);
-          if (activeIndex !== -1) {
-            state.active.splice(activeIndex, 1);
-          }
-
-          const currentCount = Math.max(0, (state.runningPerUser.get(job.userId) ?? 1) - 1);
-          if (currentCount <= 0) {
-            state.runningPerUser.delete(job.userId);
-          } else {
-            state.runningPerUser.set(job.userId, currentCount);
-          }
-
+          finalizeJob(state, job);
           void runNextJob(state);
         });
     }
@@ -124,5 +115,19 @@ function cleanupExpiredPendingJobs(state: MutableQueueState, now: number): void 
       "[ExportQueue] Removed stale pending export job(s):",
       before - state.pending.length
     );
+  }
+}
+
+function finalizeJob(state: MutableQueueState, job: PendingExportJob): void {
+  const activeIndex = state.active.findIndex((activeJob) => activeJob.jobId === job.jobId);
+  if (activeIndex !== -1) {
+    state.active.splice(activeIndex, 1);
+  }
+
+  const previousCount = state.runningPerUser.get(job.userId) ?? 0;
+  if (previousCount <= 1) {
+    state.runningPerUser.delete(job.userId);
+  } else {
+    state.runningPerUser.set(job.userId, previousCount - 1);
   }
 }

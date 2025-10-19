@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 const EXPORT_JOB_STALE_TIMEOUT_MS = Number(process.env.EXPORT_JOB_STALE_TIMEOUT_MS ?? 5 * 60 * 1000);
 
 function isValidQuality(value: string): value is ExportQuality {
-  return Object.prototype.hasOwnProperty.call(EXPORT_PRESETS, value);
+  return value in EXPORT_PRESETS;
 }
 
 function validateExportServiceConfig(): string | null {

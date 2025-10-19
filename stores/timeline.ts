@@ -12,6 +12,9 @@ const TIMELINE_TIMING_FIELDS: Array<'start_at_position' | 'duration' | 'start' |
 
 function normalizeTimelineValue(value: number | undefined): number | undefined {
   if (value === undefined) return undefined
+  if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value)) {
+    return 0
+  }
   return Math.max(0, Math.round(value))
 }
 

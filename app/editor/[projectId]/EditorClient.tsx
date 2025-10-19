@@ -34,6 +34,12 @@ interface EditorClientProps {
   project: Project
 }
 
+const rawExportPollInterval = Number(process.env.NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS ?? 2000)
+const EXPORT_POLL_INTERVAL_MS =
+  Number.isFinite(rawExportPollInterval) && rawExportPollInterval > 0
+    ? rawExportPollInterval
+    : 2000
+
 export function EditorClient({ project }: EditorClientProps) {
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
@@ -54,7 +60,6 @@ export function EditorClient({ project }: EditorClientProps) {
   useKeyboardShortcuts()
 
   const {
-    timecode,
     setTimecode,
     setFps,
     setDuration,
@@ -366,9 +371,12 @@ export function EditorClient({ project }: EditorClientProps) {
 
           // Initial poll
           void pollJobStatus()
-          exportPollRef.current = setInterval(() => {
-            void pollJobStatus()
-          }, 2000)
+          if (EXPORT_POLL_INTERVAL_MS > 0) {
+            clearExportPoll()
+            exportPollRef.current = setInterval(() => {
+              void pollJobStatus()
+            }, EXPORT_POLL_INTERVAL_MS)
+          }
         })
       } finally {
         clearExportPoll()

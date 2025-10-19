@@ -58,6 +58,17 @@ npm install
 cp .env.local.example .env.local
 # Supabase認証情報で.env.localを編集
 
+#### 主要な環境変数
+
+| 変数名 | デフォルト | 説明 |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | 必須 | Supabase プロジェクト URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 必須 | Supabase 匿名 API キー |
+| `SUPABASE_SERVICE_ROLE_KEY` | 必須 | サーバーサイド処理用サービスロールキー（エクスポートで使用） |
+| `NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS` | `2000` | エクスポート進捗ポーリング間隔（ミリ秒） |
+| `EXPORT_FFMPEG_TIMEOUT_SECONDS` | `600` | FFmpeg ジョブのタイムアウト閾値（秒） |
+| `EXPORT_QUEUE_JOB_TTL_MS` | `600000` | キュー内で保留ジョブを保持する時間（ミリ秒） |
+
 # データベースマイグレーションを実行
 # supabase/SETUP_INSTRUCTIONS.mdを参照
 
@@ -277,6 +288,10 @@ npm run build
 2. Vercelダッシュボードで環境変数を設定:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS`
+   - `EXPORT_FFMPEG_TIMEOUT_SECONDS`
+   - `EXPORT_QUEUE_JOB_TTL_MS`
 3. デプロイ
 
 ### その他のプラットフォーム

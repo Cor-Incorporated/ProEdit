@@ -76,7 +76,7 @@ export function RegisterServiceWorker() {
 export async function waitForServiceWorker(): Promise<void> {
   if (typeof window === 'undefined') return
   if (!('serviceWorker' in navigator)) return
-  const registration = await navigator.serviceWorker.ready
+  await navigator.serviceWorker.ready
   if (!navigator.serviceWorker.controller) {
     await new Promise<void>((resolve) => {
       const onChange = () => {
@@ -87,4 +87,3 @@ export async function waitForServiceWorker(): Promise<void> {
     })
   }
 }
-

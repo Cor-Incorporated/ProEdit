@@ -16,10 +16,11 @@ const QUALITY_CRF: Record<ExportQuality, number> = {
 const EXPORT_SIGNED_URL_TTL = Number(process.env.EXPORT_SIGNED_URL_TTL ?? 60 * 60 * 24);
 const EXPORT_AUDIO_BITRATE = Number(process.env.EXPORT_AUDIO_BITRATE ?? 192_000);
 const MAX_FILENAME_LENGTH = Number(process.env.EXPORT_MAX_FILENAME_LENGTH ?? 80);
-const EXPORT_FFMPEG_TIMEOUT_SECONDS = Math.max(
-  1,
-  Number(process.env.EXPORT_FFMPEG_TIMEOUT_SECONDS ?? 10 * 60)
-);
+const rawFfmpegTimeoutSeconds = Number(process.env.EXPORT_FFMPEG_TIMEOUT_SECONDS ?? 10 * 60);
+const EXPORT_FFMPEG_TIMEOUT_SECONDS =
+  Number.isFinite(rawFfmpegTimeoutSeconds) && rawFfmpegTimeoutSeconds > 0
+    ? rawFfmpegTimeoutSeconds
+    : 10 * 60;
 
 interface MediaReference {
   id: string;
