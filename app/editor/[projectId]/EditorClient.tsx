@@ -22,6 +22,7 @@ import { Download, PanelRightOpen, Type } from 'lucide-react'
 import * as PIXI from 'pixi.js'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { getEnvNumber } from '@/lib/utils/env'
 // Phase 9: Auto-save imports (AutoSaveManager managed by Zustand)
 import { ServiceWorkerDebug } from '@/app/sw-debug'
 import { ConflictResolutionDialog } from '@/components/ConflictResolutionDialog'
@@ -34,11 +35,7 @@ interface EditorClientProps {
   project: Project
 }
 
-const rawExportPollInterval = Number(process.env.NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS ?? 2000)
-const EXPORT_POLL_INTERVAL_MS =
-  Number.isFinite(rawExportPollInterval) && rawExportPollInterval > 0
-    ? rawExportPollInterval
-    : 2000
+const EXPORT_POLL_INTERVAL_MS = getEnvNumber('NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS', 2000, { min: 0 })
 
 export function EditorClient({ project }: EditorClientProps) {
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
@@ -379,6 +376,7 @@ export function EditorClient({ project }: EditorClientProps) {
           }
         })
       } finally {
+        // Safety net: ensure no leftover interval even if promise settles unexpectedly.
         clearExportPoll()
       }
     } catch (error) {

@@ -3,9 +3,10 @@ import path from "path";
 import { tmpdir } from "os";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type ffmpeg from "fluent-ffmpeg";
-import { createFfmpegCommand } from "@/lib/ffmpeg/node";
 import { EXPORT_PRESETS, ExportQuality } from "@/features/export/types";
+import { createFfmpegCommand } from "@/lib/ffmpeg/node";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { getEnvNumber } from "@/lib/utils/env";
 
 const QUALITY_CRF: Record<ExportQuality, number> = {
   "720p": 25,
@@ -13,14 +14,10 @@ const QUALITY_CRF: Record<ExportQuality, number> = {
   "4k": 21,
 };
 
-const EXPORT_SIGNED_URL_TTL = Number(process.env.EXPORT_SIGNED_URL_TTL ?? 60 * 60 * 24);
-const EXPORT_AUDIO_BITRATE = Number(process.env.EXPORT_AUDIO_BITRATE ?? 192_000);
-const MAX_FILENAME_LENGTH = Number(process.env.EXPORT_MAX_FILENAME_LENGTH ?? 80);
-const rawFfmpegTimeoutSeconds = Number(process.env.EXPORT_FFMPEG_TIMEOUT_SECONDS ?? 10 * 60);
-const EXPORT_FFMPEG_TIMEOUT_SECONDS =
-  Number.isFinite(rawFfmpegTimeoutSeconds) && rawFfmpegTimeoutSeconds > 0
-    ? rawFfmpegTimeoutSeconds
-    : 10 * 60;
+const EXPORT_SIGNED_URL_TTL = getEnvNumber("EXPORT_SIGNED_URL_TTL", 60 * 60 * 24, { min: 60 });
+const EXPORT_AUDIO_BITRATE = getEnvNumber("EXPORT_AUDIO_BITRATE", 192_000, { min: 1 });
+const MAX_FILENAME_LENGTH = Math.max(1, Math.floor(getEnvNumber("EXPORT_MAX_FILENAME_LENGTH", 80, { min: 1 })));
+const EXPORT_FFMPEG_TIMEOUT_SECONDS = getEnvNumber("EXPORT_FFMPEG_TIMEOUT_SECONDS", 10 * 60, { min: 1 });
 
 interface MediaReference {
   id: string;

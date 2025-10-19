@@ -66,7 +66,7 @@ ProEdit MVPは、ブラウザベースの動画エディターとして、すべ
 
 #### Export Pipeline
 - **ExportController**: 完全移植 (omniclip準拠)
-- **Quality Presets**: 480p, 720p, 1080p, 4K
+- **Quality Presets**: 720p, 1080p, 4K
 - **FFmpeg.wasm**: ブラウザ内エンコーディング
 - **WebCodecs**: ハードウェアアクセラレーション対応
 - **Progress Tracking**: リアルタイム進捗表示

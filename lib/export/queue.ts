@@ -1,4 +1,5 @@
 import type { ExportQuality } from "@/features/export/types";
+import { getEnvNumber } from "@/lib/utils/env";
 import { processExportJob } from "./server";
 
 interface PendingExportJob {
@@ -16,11 +17,11 @@ interface QueueState {
   processing: boolean;
 }
 
-export const MAX_CONCURRENT_EXPORTS = Number(process.env.EXPORT_MAX_CONCURRENT ?? 2);
-export const MAX_CONCURRENT_EXPORTS_PER_USER = Number(process.env.EXPORT_MAX_PER_USER ?? 1);
-const rawExportQueueTtl = Number(process.env.EXPORT_QUEUE_JOB_TTL_MS ?? 10 * 60 * 1000);
-const EXPORT_QUEUE_JOB_TTL_MS =
-  Number.isFinite(rawExportQueueTtl) && rawExportQueueTtl > 0 ? rawExportQueueTtl : 10 * 60 * 1000;
+export const MAX_CONCURRENT_EXPORTS = Math.floor(getEnvNumber("EXPORT_MAX_CONCURRENT", 2, { min: 1 }));
+export const MAX_CONCURRENT_EXPORTS_PER_USER = Math.floor(
+  getEnvNumber("EXPORT_MAX_PER_USER", 1, { min: 1 })
+);
+const EXPORT_QUEUE_JOB_TTL_MS = getEnvNumber("EXPORT_QUEUE_JOB_TTL_MS", 10 * 60 * 1000, { min: 1 });
 
 type MutableQueueState = QueueState & { initialized?: boolean };
 
@@ -102,6 +103,7 @@ function cleanupExpiredPendingJobs(state: MutableQueueState, now: number): void 
     return;
   }
 
+  // Queue state is an in-memory singleton; mutating in place keeps references in sync.
   const before = state.pending.length;
   state.pending = state.pending.filter((job) => {
     if (!job.enqueuedAt) {

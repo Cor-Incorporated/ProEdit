@@ -174,7 +174,8 @@ export class AutoSaveManager {
     const { sanitizedEffects, hasTimingDiff } = this.getSanitizedEffects(validEffects);
 
     if (hasTimingDiff) {
-      // Refresh store with sanitized values to keep UI state consistent
+      // Refresh store with sanitized values to keep UI state consistent.
+      // This update runs while isSaving=true, so AutoSave's mutex prevents recursive saves.
       useTimelineStore.getState().setEffects(sanitizedEffects);
     }
 

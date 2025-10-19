@@ -1,4 +1,5 @@
 -- Add updated_at tracking and trigger for export_jobs
+-- Requires update_updated_at_column() from 001_initial_schema.sql
 
 ALTER TABLE export_jobs
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();

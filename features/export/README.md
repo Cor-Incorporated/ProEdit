@@ -23,7 +23,7 @@ Handles video export with FFmpeg.wasm, manages export jobs, and provides progres
 
 ## Export Settings
 - Format: mp4, webm, mov
-- Quality: low, medium, high, ultra (480p, 720p, 1080p, 4K)
+- Quality: medium, high, ultra (720p, 1080p, 4K)
 - Codec: H.264, VP9, etc.
 - Bitrate: configurable
 
@@ -38,4 +38,3 @@ Handles video export with FFmpeg.wasm, manages export jobs, and provides progres
 - [ ] Phase 8: Web Worker setup
 - [ ] Phase 8: Progress tracking
 - [ ] Phase 8: Quality presets
-
