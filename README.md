@@ -5,7 +5,7 @@
 **完成度**: 実装93.9%、機能87%
 **品質**: TypeScriptエラー0件、プロダクションビルド成功
 
-> 🎯 **AI駆動開発により21時間8分で41,031行のプロダクションコードを実装。検証可能な実測データに基づく分析。**  
+> 🎯 **AI駆動開発により21時間8分で41,031行のプロダクションコードを実装（2025年10月14〜15日の実測値）。**  
 > 詳細は [AI駆動開発レポート](./AI_DRIVEN_DEVELOPMENT_REPORT.md) を参照
 
 ---
@@ -30,7 +30,7 @@ ProEdit MVPは、すべてのConstitutional要件を満たし、プロダクシ�
 - ✅ **タイムライン編集**: マルチトラックタイムライン、ドラッグ、トリム、分割
 - ✅ **リアルタイムプレビュー**: PIXI.jsによる60fps再生
 - ✅ **テキストオーバーレイ**: 40種類以上のスタイルオプションを持つフル機能テキストエディタ
-- ✅ **動画エクスポート**: 複数解像度エクスポート(480p/720p/1080p/4K)
+- ✅ **動画エクスポート**: 複数解像度エクスポート(720p/1080p/4K)
 - ✅ **自動保存**: 5秒デバウンス自動保存、競合検出機能付き
 
 ---
@@ -57,6 +57,17 @@ npm install
 # 環境変数を設定
 cp .env.local.example .env.local
 # Supabase認証情報で.env.localを編集
+
+#### 主要な環境変数
+
+| 変数名 | デフォルト | 説明 |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | 必須 | Supabase プロジェクト URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 必須 | Supabase 匿名 API キー |
+| `SUPABASE_SERVICE_ROLE_KEY` | 必須 | サーバーサイド処理用サービスロールキー（エクスポートで使用） |
+| `NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS` | `2000` | エクスポート進捗ポーリング間隔（ミリ秒） |
+| `EXPORT_FFMPEG_TIMEOUT_SECONDS` | `600` | FFmpeg ジョブのタイムアウト閾値（秒） |
+| `EXPORT_QUEUE_JOB_TTL_MS` | `600000` | キュー内で保留ジョブを保持する時間（ミリ秒） |
 
 # データベースマイグレーションを実行
 # supabase/SETUP_INSTRUCTIONS.mdを参照
@@ -277,6 +288,10 @@ npm run build
 2. Vercelダッシュボードで環境変数を設定:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_EXPORT_POLL_INTERVAL_MS`
+   - `EXPORT_FFMPEG_TIMEOUT_SECONDS`
+   - `EXPORT_QUEUE_JOB_TTL_MS`
 3. デプロイ
 
 ### その他のプラットフォーム

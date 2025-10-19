@@ -97,9 +97,9 @@ export class TrimHandler {
     }
 
     return {
-      start_at_position: newStartPosition,
-      start: newStart,
-      duration: newDuration,
+      start_at_position: this.normalizeTimelineValue(newStartPosition),
+      start: this.normalizeTimelineValue(newStart),
+      duration: this.normalizeTimelineValue(newDuration),
     }
   }
 
@@ -132,8 +132,8 @@ export class TrimHandler {
     }
 
     return {
-      end: newEnd,
-      duration: newDuration,
+      end: this.normalizeTimelineValue(newEnd),
+      duration: this.normalizeTimelineValue(newDuration),
     }
   }
 
@@ -200,5 +200,12 @@ export class TrimHandler {
    */
   getTrimSide(): 'start' | 'end' | null {
     return this.trimSide
+  }
+
+  /**
+   * Normalize timeline values to integer milliseconds
+   */
+  private normalizeTimelineValue(value: number): number {
+    return Math.max(0, Math.round(value))
   }
 }

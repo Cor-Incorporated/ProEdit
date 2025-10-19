@@ -81,7 +81,7 @@ export class DragHandler {
     )
 
     return {
-      start_at_position: proposed.proposed_place.start_at_position,
+      start_at_position: this.normalizeTimelineValue(proposed.proposed_place.start_at_position),
       track: proposed.proposed_place.track,
     }
   }
@@ -138,5 +138,12 @@ export class DragHandler {
    */
   updateZoom(zoom: number): void {
     this.zoom = zoom
+  }
+
+  /**
+   * Normalize timeline values to integer milliseconds
+   */
+  private normalizeTimelineValue(value: number): number {
+    return Math.max(0, Math.round(value))
   }
 }

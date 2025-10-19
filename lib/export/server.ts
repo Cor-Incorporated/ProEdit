@@ -2,9 +2,11 @@ import { createReadStream, promises as fs } from "fs";
 import path from "path";
 import { tmpdir } from "os";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createFfmpegCommand } from "@/lib/ffmpeg/node";
+import type ffmpeg from "fluent-ffmpeg";
 import { EXPORT_PRESETS, ExportQuality } from "@/features/export/types";
+import { createFfmpegCommand } from "@/lib/ffmpeg/node";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { getEnvNumber } from "@/lib/utils/env";
 
 const QUALITY_CRF: Record<ExportQuality, number> = {
   "720p": 25,
@@ -12,9 +14,10 @@ const QUALITY_CRF: Record<ExportQuality, number> = {
   "4k": 21,
 };
 
-const EXPORT_SIGNED_URL_TTL = Number(process.env.EXPORT_SIGNED_URL_TTL ?? 60 * 60 * 24);
-const EXPORT_AUDIO_BITRATE = Number(process.env.EXPORT_AUDIO_BITRATE ?? 192_000);
-const MAX_FILENAME_LENGTH = Number(process.env.EXPORT_MAX_FILENAME_LENGTH ?? 80);
+const EXPORT_SIGNED_URL_TTL = getEnvNumber("EXPORT_SIGNED_URL_TTL", 60 * 60 * 24, { min: 60 });
+const EXPORT_AUDIO_BITRATE = getEnvNumber("EXPORT_AUDIO_BITRATE", 192_000, { min: 1 });
+const MAX_FILENAME_LENGTH = Math.max(1, Math.floor(getEnvNumber("EXPORT_MAX_FILENAME_LENGTH", 80, { min: 1 })));
+const EXPORT_FFMPEG_TIMEOUT_SECONDS = getEnvNumber("EXPORT_FFMPEG_TIMEOUT_SECONDS", 10 * 60, { min: 1 });
 
 interface MediaReference {
   id: string;
@@ -76,33 +79,30 @@ async function transcodeClip(
   height: number,
   crf: number
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    createFfmpegCommand(sourcePath)
-      .setStartTime(startSeconds)
-      .duration(durationSeconds)
-      .outputOptions([
-        "-vf",
-        `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        String(crf),
-        "-c:a",
-        "aac",
-        "-b:a",
-        `${EXPORT_AUDIO_BITRATE}`,
-        "-ac",
-        "2",
-        "-movflags",
-        "+faststart",
-      ])
-      .output(targetPath)
-      .on("end", () => resolve())
-      .on("error", (error: Error) => reject(error))
-      .run();
-  });
+  const command = createFfmpegCommand(sourcePath)
+    .setStartTime(startSeconds)
+    .duration(durationSeconds)
+    .outputOptions([
+      "-vf",
+      `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      String(crf),
+      "-c:a",
+      "aac",
+      "-b:a",
+      `${EXPORT_AUDIO_BITRATE}`,
+      "-ac",
+      "2",
+      "-movflags",
+      "+faststart",
+    ])
+    .output(targetPath);
+
+  await runFfmpegWithTimeout(command, EXPORT_FFMPEG_TIMEOUT_SECONDS);
 }
 
 async function concatClips(clipPaths: string[], outputPath: string): Promise<void> {
@@ -111,19 +111,56 @@ async function concatClips(clipPaths: string[], outputPath: string): Promise<voi
   await fs.writeFile(concatFile, fileEntries, "utf-8");
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      createFfmpegCommand()
-        .input(concatFile)
-        .inputOptions(["-f concat", "-safe 0"])
-        .outputOptions(["-c copy"])
-        .output(outputPath)
-        .on("end", () => resolve())
-        .on("error", (error: Error) => reject(error))
-        .run();
-    });
+    const command = createFfmpegCommand()
+      .input(concatFile)
+      .inputOptions(["-f concat", "-safe 0"])
+      .outputOptions(["-c copy"])
+      .output(outputPath);
+
+    await runFfmpegWithTimeout(command, EXPORT_FFMPEG_TIMEOUT_SECONDS);
   } finally {
     await fs.rm(concatFile, { force: true }).catch(() => undefined);
   }
+}
+
+function runFfmpegWithTimeout(
+  command: ffmpeg.FfmpegCommand,
+  timeoutSeconds: number
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let timeoutHandle: NodeJS.Timeout | null = null;
+    let timedOut = false;
+
+    const clearTimer = () => {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+    };
+
+    command
+      .on("start", () => {
+        if (timeoutSeconds > 0 && Number.isFinite(timeoutSeconds)) {
+          timeoutHandle = setTimeout(() => {
+            timedOut = true;
+            command.kill("SIGKILL");
+          }, timeoutSeconds * 1000);
+        }
+      })
+      .on("end", () => {
+        clearTimer();
+        resolve();
+      })
+      .on("error", (error: Error) => {
+        clearTimer();
+        if (timedOut) {
+          reject(new Error(`FFmpeg timed out after ${timeoutSeconds}s`));
+        } else {
+          reject(error);
+        }
+      })
+      .run();
+  });
 }
 
 async function updateJobProgress(
