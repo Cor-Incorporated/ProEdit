@@ -3,6 +3,36 @@ import { Effect } from '@/types/effects'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 
+const TIMELINE_TIMING_FIELDS: Array<'start_at_position' | 'duration' | 'start' | 'end'> = [
+  'start_at_position',
+  'duration',
+  'start',
+  'end',
+]
+
+function normalizeTimelineValue(value: number | undefined): number | undefined {
+  if (value === undefined) return undefined
+  return Math.max(0, Math.round(value))
+}
+
+function sanitizeEffect(effect: Effect): Effect {
+  const sanitized = { ...effect }
+  for (const key of TIMELINE_TIMING_FIELDS) {
+    sanitized[key] = normalizeTimelineValue(effect[key]) as Effect[typeof key]
+  }
+  return sanitized
+}
+
+function sanitizeEffectUpdates(updates: Partial<Effect>): Partial<Effect> {
+  const sanitized: Partial<Effect> = { ...updates }
+  for (const key of TIMELINE_TIMING_FIELDS) {
+    if (sanitized[key] !== undefined) {
+      sanitized[key] = normalizeTimelineValue(sanitized[key] as number) as Effect[typeof key]
+    }
+  }
+  return sanitized
+}
+
 // Global AutoSaveManager instance
 let autoSaveManagerInstance: AutoSaveManager | null = null
 
@@ -81,14 +111,15 @@ export const useTimelineStore = create<TimelineStore>()(
       snapEnabled: true,
 
       // Actions
-      setEffects: (effects) => set({ effects }),
+      setEffects: (effects) => set({ effects: effects.map(sanitizeEffect) }),
 
       addEffect: (effect) => {
+        const sanitizedEffect = sanitizeEffect(effect)
         set((state) => ({
-          effects: [...state.effects, effect],
+          effects: [...state.effects, sanitizedEffect],
           duration: Math.max(
             state.duration,
-            effect.start_at_position + effect.duration
+            sanitizedEffect.start_at_position + sanitizedEffect.duration
           )
         }))
         // Phase 9: Trigger auto-save after state change
@@ -96,9 +127,10 @@ export const useTimelineStore = create<TimelineStore>()(
       },
 
       updateEffect: (id, updates) => {
+        const sanitizedUpdates = sanitizeEffectUpdates(updates)
         set((state) => ({
           effects: state.effects.map(e =>
-            e.id === id ? { ...e, ...updates } as Effect : e
+            e.id === id ? sanitizeEffect({ ...e, ...sanitizedUpdates } as Effect) : e
           )
         }))
         // Phase 9: Trigger auto-save after state change
@@ -167,7 +199,7 @@ export const useTimelineStore = create<TimelineStore>()(
         snapEnabled: !state.snapEnabled
       })),
 
-      restoreSnapshot: (effects) => set({ effects }),
+      restoreSnapshot: (effects) => set({ effects: effects.map(sanitizeEffect) }),
 
       // Phase 9: Auto-save initialization
       initAutoSave: (projectId, onStatusChange) => {

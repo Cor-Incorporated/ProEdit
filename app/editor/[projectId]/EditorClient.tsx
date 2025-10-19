@@ -295,80 +295,84 @@ export function EditorClient({ project }: EditorClientProps) {
         throw new Error('エクスポートジョブIDの取得に失敗しました')
       }
 
-      await new Promise<void>((resolve, reject) => {
-        const pollJobStatus = async () => {
-          try {
-            const statusResponse = await fetch(`/api/render/${jobId}`)
-            const jobPayload = await statusResponse.json().catch(() => ({}))
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const pollJobStatus = async () => {
+            try {
+              const statusResponse = await fetch(`/api/render/${jobId}`)
+              const jobPayload = await statusResponse.json().catch(() => ({}))
 
-            if (!statusResponse.ok) {
-              const message =
-                typeof jobPayload?.error === 'string'
-                  ? jobPayload.error
-                  : `ジョブステータスの取得に失敗しました (HTTP ${statusResponse.status})`
-              throw new Error(message)
-            }
-
-            const jobStatus = String(jobPayload.status ?? 'pending')
-            const mappedStatus = mapJobStatusToProgress(jobStatus)
-            const jobProgress = typeof jobPayload.progress === 'number' ? jobPayload.progress : 0
-
-            onProgress({
-              status: mappedStatus,
-              progress: jobProgress,
-              currentFrame: 0,
-              totalFrames: 0,
-            })
-
-            if (jobStatus === 'completed' && jobPayload.downloadUrl) {
-              clearExportPoll()
-
-              const downloadResponse = await fetch(jobPayload.downloadUrl)
-              if (!downloadResponse.ok) {
-                throw new Error('エクスポート済みファイルの取得に失敗しました')
+              if (!statusResponse.ok) {
+                const message =
+                  typeof jobPayload?.error === 'string'
+                    ? jobPayload.error
+                    : `ジョブステータスの取得に失敗しました (HTTP ${statusResponse.status})`
+                throw new Error(message)
               }
 
-              const arrayBuffer = await downloadResponse.arrayBuffer()
-              const data = new Uint8Array(arrayBuffer)
-              const filename =
-                typeof jobPayload.filename === 'string'
-                  ? jobPayload.filename
-                  : `export_${quality}_${Date.now()}.mp4`
-
-              downloadFile(data, filename)
+              const jobStatus = String(jobPayload.status ?? 'pending')
+              const mappedStatus = mapJobStatusToProgress(jobStatus)
+              const jobProgress = typeof jobPayload.progress === 'number' ? jobPayload.progress : 0
 
               onProgress({
-                status: 'complete',
-                progress: 100,
+                status: mappedStatus,
+                progress: jobProgress,
                 currentFrame: 0,
                 totalFrames: 0,
               })
 
-              toast.success('エクスポートが完了しました！')
-              resolve()
-              return
-            }
+              if (jobStatus === 'completed' && jobPayload.downloadUrl) {
+                clearExportPoll()
 
-            if (jobStatus === 'failed') {
+                const downloadResponse = await fetch(jobPayload.downloadUrl)
+                if (!downloadResponse.ok) {
+                  throw new Error('エクスポート済みファイルの取得に失敗しました')
+                }
+
+                const arrayBuffer = await downloadResponse.arrayBuffer()
+                const data = new Uint8Array(arrayBuffer)
+                const filename =
+                  typeof jobPayload.filename === 'string'
+                    ? jobPayload.filename
+                    : `export_${quality}_${Date.now()}.mp4`
+
+                downloadFile(data, filename)
+
+                onProgress({
+                  status: 'complete',
+                  progress: 100,
+                  currentFrame: 0,
+                  totalFrames: 0,
+                })
+
+                toast.success('エクスポートが完了しました！')
+                resolve()
+                return
+              }
+
+              if (jobStatus === 'failed') {
+                clearExportPoll()
+                const errorMessage =
+                  typeof jobPayload.error_message === 'string' && jobPayload.error_message.length > 0
+                    ? jobPayload.error_message
+                    : 'サーバーエクスポートに失敗しました'
+                throw new Error(errorMessage)
+              }
+            } catch (error) {
               clearExportPoll()
-              const errorMessage =
-                typeof jobPayload.error_message === 'string' && jobPayload.error_message.length > 0
-                  ? jobPayload.error_message
-                  : 'サーバーエクスポートに失敗しました'
-              throw new Error(errorMessage)
+              reject(error)
             }
-          } catch (error) {
-            clearExportPoll()
-            reject(error)
           }
-        }
 
-        // Initial poll
-        void pollJobStatus()
-        exportPollRef.current = setInterval(() => {
+          // Initial poll
           void pollJobStatus()
-        }, 2000)
-      })
+          exportPollRef.current = setInterval(() => {
+            void pollJobStatus()
+          }, 2000)
+        })
+      } finally {
+        clearExportPoll()
+      }
     } catch (error) {
       console.error('Export error:', error)
       clearExportPoll()

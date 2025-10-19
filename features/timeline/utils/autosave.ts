@@ -8,6 +8,7 @@ import { saveProject } from "@/app/actions/projects";
 import { logger } from "@/lib/utils/logger";
 import { useMediaStore } from "@/stores/media";
 import { useTimelineStore } from "@/stores/timeline";
+import { Effect } from "@/types/effects";
 
 export class AutoSaveManager {
   private debounceTimer: NodeJS.Timeout | null = null;
@@ -169,9 +170,17 @@ export class AutoSaveManager {
       logger.info(`[AutoSave] Filtered out ${timelineState.effects.length - validEffects.length} invalid effect(s)`);
     }
 
-    // Gather all data to save
+    // Normalize timing before saving
+    const { sanitizedEffects, hasTimingDiff } = this.getSanitizedEffects(validEffects);
+
+    if (hasTimingDiff) {
+      // Refresh store with sanitized values to keep UI state consistent
+      useTimelineStore.getState().setEffects(sanitizedEffects);
+    }
+
+    // Prepare payload for persistence
     const projectData = {
-      effects: validEffects,
+      effects: sanitizedEffects,
       mediaFiles: mediaState.mediaFiles,
       lastModified: new Date().toISOString(),
     };
@@ -243,6 +252,36 @@ export class AutoSaveManager {
       isOnline: this.isOnline,
       isSaving: this.isSaving,
     };
+  }
+
+  /**
+   * Normalize effect timing before persistence
+   */
+  private getSanitizedEffects(effects: Effect[]): { sanitizedEffects: Effect[]; hasTimingDiff: boolean } {
+    let hasTimingDiff = false;
+    const sanitizedEffects = effects.map((effect) => {
+      const sanitized: Effect = {
+        ...effect,
+        start_at_position: Math.max(0, Math.round(effect.start_at_position)),
+        duration: Math.max(0, Math.round(effect.duration)),
+        start: Math.max(0, Math.round(effect.start)),
+        end: Math.max(0, Math.round(effect.end)),
+      };
+
+      if (
+        !hasTimingDiff &&
+        (sanitized.start_at_position !== effect.start_at_position ||
+          sanitized.duration !== effect.duration ||
+          sanitized.start !== effect.start ||
+          sanitized.end !== effect.end)
+      ) {
+        hasTimingDiff = true;
+      }
+
+      return sanitized;
+    });
+
+    return { sanitizedEffects, hasTimingDiff };
   }
 
   /**
