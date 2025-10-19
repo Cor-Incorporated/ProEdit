@@ -8,6 +8,7 @@ export interface MediaStore {
   isLoading: boolean
   uploadProgress: number
   selectedMediaIds: string[]
+  isInitialized: boolean
 
   // Actions
   setMediaFiles: (files: MediaFile[]) => void
@@ -27,17 +28,20 @@ export const useMediaStore = create<MediaStore>()(
       isLoading: false,
       uploadProgress: 0,
       selectedMediaIds: [],
+      isInitialized: false,
 
       // Actions
-      setMediaFiles: (files) => set({ mediaFiles: files }),
+      setMediaFiles: (files) => set({ mediaFiles: files, isInitialized: true }),
 
       addMediaFile: (file) => set((state) => ({
-        mediaFiles: [file, ...state.mediaFiles]
+        mediaFiles: [file, ...state.mediaFiles],
+        isInitialized: true,
       })),
 
       removeMediaFile: (id) => set((state) => ({
         mediaFiles: state.mediaFiles.filter(f => f.id !== id),
-        selectedMediaIds: state.selectedMediaIds.filter(sid => sid !== id)
+        selectedMediaIds: state.selectedMediaIds.filter(sid => sid !== id),
+        isInitialized: true,
       })),
 
       setLoading: (loading) => set({ isLoading: loading }),

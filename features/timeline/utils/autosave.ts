@@ -139,32 +139,40 @@ export class AutoSaveManager {
     const timelineState = useTimelineStore.getState();
     const mediaState = useMediaStore.getState();
 
-    // Get valid media file IDs
-    const validMediaIds = new Set(mediaState.mediaFiles.map(m => m.id));
+    // Guard: Defer media validation until media store completes its initial sync.
+    // This prevents legitimate video effects from being dropped before media metadata loads.
+    const shouldValidateMediaLinks = mediaState.isInitialized;
+    const validMediaIds = shouldValidateMediaLinks
+      ? new Set(mediaState.mediaFiles.map(m => m.id))
+      : null;
 
-    // CRITICAL: Filter out effects that reference deleted media files
-    // This prevents foreign key constraint violations
-    const validEffects = timelineState.effects.filter(effect => {
-      // Text effects don't have media_file_id
-      if (effect.kind === 'text') {
-        return true;
-      }
-      
-      // Check if media_file_id exists and is valid
-      if (!effect.media_file_id) {
-        logger.warn(`[AutoSave] Effect ${effect.id} has no media_file_id, skipping`);
-        return false;
-      }
-      
-      const isValid = validMediaIds.has(effect.media_file_id);
-      if (!isValid) {
-        logger.warn(`[AutoSave] Effect ${effect.id} references deleted media ${effect.media_file_id}, removing from store`);
-        // Remove from store to prevent future errors
-        useTimelineStore.getState().removeEffect(effect.id);
-      }
-      
-      return isValid;
-    });
+    if (!shouldValidateMediaLinks) {
+      logger.debug('[AutoSave] Media store not initialized, skipping media reference validation');
+    }
+
+    const validEffects = shouldValidateMediaLinks
+      ? timelineState.effects.filter(effect => {
+          // Text effects don't have media_file_id
+          if (effect.kind === 'text') {
+            return true;
+          }
+
+          // Check if media_file_id exists and is valid
+          if (!effect.media_file_id) {
+            logger.warn(`[AutoSave] Effect ${effect.id} has no media_file_id, skipping`);
+            return false;
+          }
+
+          const isValid = validMediaIds?.has(effect.media_file_id) ?? false;
+          if (!isValid) {
+            logger.warn(`[AutoSave] Effect ${effect.id} references deleted media ${effect.media_file_id}, removing from store`);
+            // Remove from store to prevent future errors
+            useTimelineStore.getState().removeEffect(effect.id);
+          }
+
+          return isValid;
+        })
+      : timelineState.effects;
 
     if (validEffects.length < timelineState.effects.length) {
       logger.info(`[AutoSave] Filtered out ${timelineState.effects.length - validEffects.length} invalid effect(s)`);
